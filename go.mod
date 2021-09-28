@@ -1,6 +1,6 @@
 module github.com/huskar-t/blm_demo
 
-go 1.16
+go 1.14
 
 require (
 	github.com/BurntSushi/toml v0.4.1

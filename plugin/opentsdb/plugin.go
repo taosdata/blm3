@@ -33,7 +33,7 @@ func (p *Plugin) Init(r gin.IRouter) error {
 	if err != nil {
 		return err
 	}
-	if p.conf.OpenTSDB.Disable {
+	if !p.conf.OpenTSDB.Enable {
 		logger.Info("opentsdb Disabled")
 		return nil
 	}
@@ -43,14 +43,14 @@ func (p *Plugin) Init(r gin.IRouter) error {
 }
 
 func (p *Plugin) Start() error {
-	if p.conf.OpenTSDB.Disable {
+	if !p.conf.OpenTSDB.Enable {
 		return nil
 	}
 	return nil
 }
 
 func (p *Plugin) Stop() error {
-	if p.conf.OpenTSDB.Disable {
+	if !p.conf.OpenTSDB.Enable {
 		return nil
 	}
 	if p.pool != nil {

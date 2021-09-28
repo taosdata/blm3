@@ -5,6 +5,6 @@ type Config struct {
 }
 
 type OpenTSDB struct {
-	DB      string
-	Disable bool
+	DB     string
+	Enable bool
 }
