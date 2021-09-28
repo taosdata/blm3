@@ -25,7 +25,7 @@ var (
 )
 
 func init() {
-	cp := flag.String("config path", "", "default ./config/blm3.toml")
+	cp := flag.String("c", "", "default ./config/blm3.toml")
 	flag.Parse()
 	if *cp != "" {
 		configPath = *cp

@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/huskar-t/blm_demo/config"
 	"github.com/huskar-t/blm_demo/plugin"
 	_ "github.com/huskar-t/blm_demo/plugin/opentsdb"
 	"github.com/huskar-t/blm_demo/rest"
 	"github.com/taosdata/go-utils/web"
-	"golang.org/x/sync/errgroup"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,12 +33,35 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 	}
 	fmt.Println("server on :", config.Conf.Port)
-	var g errgroup.Group
-	g.Go(server.ListenAndServe)
+	go func() {
+		// 服务连接
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	<-quit
-	fmt.Println("stop server start")
-	plugin.Stop()
-	fmt.Println("stop server finished")
+	log.Println("Shutdown WebServer ...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		if err := server.Shutdown(ctx); err != nil {
+			log.Println("WebServer Shutdown error:", err)
+		}
+	}()
+	log.Println("Stop Plugins ...")
+	ticker := time.NewTicker(time.Second * 5)
+	done := make(chan struct{})
+	go func() {
+		plugin.Stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+		break
+	case <-ticker.C:
+		break
+	}
+	log.Println("Server exiting")
 }
