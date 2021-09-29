@@ -1,0 +1,5 @@
+Debug = true
+Port = 6041
+[opentsdb]
+Enable = true
+DB = "test_opentsdb"
