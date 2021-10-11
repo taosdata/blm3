@@ -6,6 +6,7 @@ import (
 	"github.com/huskar-t/blm_demo/tools/pool"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/sirupsen/logrus"
+	"io"
 	"math/rand"
 	"path"
 	"time"
@@ -13,6 +14,32 @@ import (
 
 var logger = logrus.New()
 var ServerID = randomID()
+var globalLogFormatter = &TaosLogFormatter{}
+
+type FileHook struct {
+	formatter logrus.Formatter
+	writer    io.Writer
+}
+
+func NewFileHook(formatter logrus.Formatter, writer io.Writer) *FileHook {
+	return &FileHook{formatter: formatter, writer: writer}
+}
+
+func (f *FileHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (f *FileHook) Fire(entry *logrus.Entry) error {
+	data, err := f.formatter.Format(entry)
+	if err != nil {
+		return err
+	}
+	_, err = f.writer.Write(data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func ConfigLog() {
 	l, err := logrus.ParseLevel(config.Conf.LogLevel)
@@ -20,6 +47,7 @@ func ConfigLog() {
 		panic(err)
 	}
 	logger.SetLevel(l)
+
 	writer, err := rotatelogs.New(
 		path.Join(config.Conf.Log.Path, "blm_%Y_%m_%d_%H_%M.log"),
 		rotatelogs.WithRotationCount(config.Conf.Log.RotationCount),
@@ -28,14 +56,15 @@ func ConfigLog() {
 	if err != nil {
 		panic(err)
 	}
-	logger.SetOutput(writer)
+	hook := NewFileHook(globalLogFormatter, writer)
+	logger.AddHook(hook)
 }
 
 func GetLogger(model string) *logrus.Entry {
 	return logger.WithFields(logrus.Fields{"model": model})
 }
 func init() {
-	logger.SetFormatter(&TaosLogFormatter{})
+	logger.SetFormatter(globalLogFormatter)
 }
 
 func randomID() string {

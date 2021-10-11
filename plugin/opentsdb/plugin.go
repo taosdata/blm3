@@ -1,15 +1,18 @@
 package opentsdb
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/plugin"
+	"github.com/huskar-t/blm_demo/tools/pool"
 	"github.com/huskar-t/blm_demo/tools/web"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/taosdata/driver-go/v2/af"
+	"io"
 	"net/http"
 	"time"
 )
@@ -35,8 +38,8 @@ func (p *Plugin) Init(r gin.IRouter) error {
 		logger.Info("opentsdb Disabled")
 		return nil
 	}
-	r.POST("put/:db", plugin.Auth(p.errorResponse), p.insertJson)
-	//r.POST("put/telnet/:db", plugin.Auth(p.errorResponse), p.insertTelnet)
+	r.POST("put/json/:db", plugin.Auth(p.errorResponse), p.insertJson)
+	r.POST("put/telnet/:db", plugin.Auth(p.errorResponse), p.insertTelnet)
 	return nil
 }
 
@@ -93,7 +96,7 @@ func (p *Plugin) insertJson(c *gin.Context) {
 	}
 	start := time.Now()
 	logger.Debug(start, "insert json payload", string(data))
-	err = conn.InsertJsonPayload(string(data))
+	err = conn.OpenTSDBInsertJsonPayload(string(data))
 	logger.Debug("insert json payload cast:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Error("insert json payload error", string(data))
@@ -103,61 +106,72 @@ func (p *Plugin) insertJson(c *gin.Context) {
 	p.successResponse(c)
 }
 
-//func (p *Plugin) insertTelnet(c *gin.Context) {
-//	db := c.Param("db")
-//	if len(db) == 0 {
-//		p.errorResponse(c, http.StatusBadRequest, errors.New("db required"))
-//		return
-//	}
-//	rd := bufio.NewReader(c.Request.Body)
-//	var lines []string
-//	tmp := pool.BytesPoolGet()
-//	defer pool.BytesPoolPut(tmp)
-//	for {
-//		l, hasNext, err := rd.ReadLine()
-//		if err != nil {
-//			if err == io.EOF {
-//				break
-//			} else {
-//				p.errorResponse(c, http.StatusBadRequest, err)
-//				return
-//			}
-//		}
-//		tmp.Write(l)
-//		if !hasNext {
-//			lines = append(lines, tmp.String())
-//			tmp.Reset()
-//		}
-//	}
-//
-//	user, password, err := plugin.GetAuth(c)
-//	if err != nil {
-//		p.errorResponse(c, http.StatusUnauthorized, err)
-//		return
-//	}
-//	conn, err := af.Open("", user, password, "", 0)
-//	if err != nil {
-//		p.errorResponse(c, http.StatusInternalServerError, err)
-//		return
-//	}
-//	defer conn.Close()
-//	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
-//	if err != nil {
-//		p.errorResponse(c, http.StatusInternalServerError, err)
-//		return
-//	}
-//	_, err = conn.Exec(fmt.Sprintf("use %s", db))
-//	if err != nil {
-//		p.errorResponse(c, http.StatusInternalServerError, err)
-//		return
-//	}
-//	err = conn.InsertTelnetLines(lines)
-//	if err != nil {
-//		p.errorResponse(c, http.StatusInternalServerError, err)
-//		return
-//	}
-//	p.successResponse(c)
-//}
+func (p *Plugin) insertTelnet(c *gin.Context) {
+	id := web.GetRequestID(c)
+	logger := logger.WithField("sessionID", id)
+	db := c.Param("db")
+	if len(db) == 0 {
+		logger.Errorln("db required")
+		p.errorResponse(c, http.StatusBadRequest, errors.New("db required"))
+		return
+	}
+	rd := bufio.NewReader(c.Request.Body)
+	var lines []string
+	tmp := pool.BytesPoolGet()
+	defer pool.BytesPoolPut(tmp)
+	for {
+		l, hasNext, err := rd.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				p.errorResponse(c, http.StatusBadRequest, err)
+				return
+			}
+		}
+		tmp.Write(l)
+		if !hasNext {
+			lines = append(lines, tmp.String())
+			tmp.Reset()
+		}
+	}
+
+	user, password, err := plugin.GetAuth(c)
+	if err != nil {
+		logger.WithError(err).Error("get auth error")
+		p.errorResponse(c, http.StatusBadRequest, err)
+		return
+	}
+	conn, err := af.Open("", user, password, "", 0)
+	if err != nil {
+		logger.WithError(err).Error("connect taosd error")
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	defer conn.Close()
+	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
+	if err != nil {
+		logger.WithError(err).Error("create database error", db)
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	_, err = conn.Exec(fmt.Sprintf("use %s", db))
+	if err != nil {
+		logger.WithError(err).Error("change to database error", db)
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	start := time.Now()
+	logger.Debug(start, "insert telnet payload", lines)
+	err = conn.OpenTSDBInsertTelnetLines(lines)
+	logger.Debug("insert telnet payload cast:", time.Now().Sub(start))
+	if err != nil {
+		logger.WithError(err).Error("insert telnet payload error", lines)
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	p.successResponse(c)
+}
 
 type message struct {
 	Code    int    `json:"code"`

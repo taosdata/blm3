@@ -2,8 +2,6 @@ package influxdb
 
 import (
 	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/log"
@@ -16,15 +14,16 @@ import (
 	"github.com/taosdata/driver-go/v2/af"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 var logger = log.GetLogger("influxdb")
 
 type Influxdb struct {
-	conf Config
+	conf    Config
+	builtDB sync.Map
 }
 
 func (p *Influxdb) String() string {
@@ -62,26 +61,10 @@ func (p *Influxdb) write(c *gin.Context) {
 	logger := logger.WithField("sessionID", id)
 	var lines []string
 	rd := bufio.NewReader(c.Request.Body)
-	precisionReq := c.Query("precision")
-	var precision Precision
-	var ok bool
-	if len(precisionReq) == 0 {
-		precision = PrecisionNanoSecond
-	} else {
-		precision, ok = convertPrecision(precisionReq)
-		if !ok {
-			logger.Errorln("unknown precision", precisionReq)
-			p.badRequestResponse(c, &badRequest{
-				Code:    "invalid",
-				Message: "unknown precision",
-				Op:      "convert precision",
-				Err:     fmt.Sprintf("recision %s unknown", precisionReq),
-				Line:    0,
-			})
-			return
-		}
+	precision := c.Query("precision")
+	if len(precision) == 0 {
+		precision = "ns"
 	}
-
 	tmp := pool.BytesPoolGet()
 	defer pool.BytesPoolPut(tmp)
 	for {
@@ -103,19 +86,7 @@ func (p *Influxdb) write(c *gin.Context) {
 		}
 		tmp.Write(l)
 		if !hasNext {
-			line, err := convertLine(tmp, precision)
-			if err != nil {
-				logger.Errorln("convert line error", err)
-				p.badRequestResponse(c, &badRequest{
-					Code:    "invalid",
-					Message: "convert line error",
-					Op:      "convert line",
-					Err:     err.Error(),
-					Line:    len(lines),
-				})
-				return
-			}
-			lines = append(lines, line)
+			lines = append(lines, tmp.String())
 			tmp.Reset()
 		}
 	}
@@ -139,22 +110,28 @@ func (p *Influxdb) write(c *gin.Context) {
 		})
 		return
 	}
-
-	conn, err := af.Open("", user, password, db, 0)
+	conn, err := af.Open("", user, password, "", 0)
 	if err != nil {
+		logger.WithError(err).Errorln("connect taosd error")
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
 	defer conn.Close()
-	_, err = conn.Exec(fmt.Sprintf("create database if not exist %s precision 'ns'", db))
+	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns'", db))
 	if err != nil {
 		logger.WithError(err).Errorln("create database error", db)
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
+	_, err = conn.Exec(fmt.Sprintf("use %s", db))
+	if err != nil {
+		logger.WithError(err).Error("change to database error", db)
+		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
+		return
+	}
 	start := time.Now()
 	logger.Debugln(start, "insert lines", lines)
-	err = conn.InsertLines(lines)
+	err = conn.InfluxDBInsertLines(lines, precision)
 	logger.Debugln("insert lines finish cast:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Errorln("insert lines error", lines)
@@ -203,88 +180,6 @@ func getAuth(c *gin.Context) {
 	}
 	if len(password) != 0 {
 		c.Set(plugin.PasswordKey, password)
-	}
-}
-
-type Precision int
-
-//ns - nanoseconds
-//u or µ - microseconds
-//ms - milliseconds
-//s - seconds
-//m - minutes
-//h - hours
-const (
-	PrecisionNanoSecond Precision = iota + 1
-	PrecisionMicroSecond
-	PrecisionMillSecond
-	PrecisionSecond
-	PrecisionMinute
-	PrecisionHour
-)
-
-func convertPrecision(precision string) (Precision, bool) {
-	switch precision {
-	case "ns":
-		return PrecisionNanoSecond, true
-	case "u", "µ":
-		return PrecisionMicroSecond, true
-	case "ms":
-		return PrecisionMillSecond, true
-	case "s":
-		return PrecisionSecond, true
-	case "m":
-		return PrecisionMinute, true
-	case "h":
-		return PrecisionHour, true
-	default:
-		return 0, false
-	}
-}
-
-func convertLine(line *bytes.Buffer, precision Precision) (string, error) {
-	switch precision {
-	case PrecisionNanoSecond:
-		line.WriteString("ns")
-		return line.String(), nil
-	case PrecisionMicroSecond:
-		line.WriteString("us")
-		return line.String(), nil
-	case PrecisionMillSecond:
-		line.WriteString("ms")
-		return line.String(), nil
-	case PrecisionSecond:
-		line.WriteString("s")
-		return line.String(), nil
-	case PrecisionMinute, PrecisionHour:
-		l := line.String()
-		splitIndex := 0
-		for i := len(l) - 1; i > 0; i-- {
-			if l[i] == ' ' {
-				splitIndex = i + 1
-				break
-			}
-		}
-		if splitIndex == 0 {
-			return "", fmt.Errorf("line format error %s", l)
-		}
-		t, err := strconv.ParseInt(l[splitIndex:], 10, 64)
-		if err != nil {
-			return "", err
-		}
-		b := bytes.NewBufferString(l[:splitIndex])
-		multiple := int64(1)
-		if precision == PrecisionMinute {
-			multiple = 60
-		} else if precision == PrecisionHour {
-			multiple = 3600
-		}
-		ts := strconv.FormatInt(t*multiple, 10)
-		b.WriteString(ts)
-		b.WriteString("s")
-		return b.String(), nil
-	default:
-		return "", errors.New("unknown precision")
 	}
 }
 

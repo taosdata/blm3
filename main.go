@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/pprof"
@@ -46,7 +45,6 @@ func main() {
 	config.Init()
 	log.ConfigLog()
 	logger.Info("start server:", log.ServerID)
-	fmt.Println("start server:", log.ServerID)
 	router := createRouter(config.Conf.Debug, &config.Conf.Cors, false)
 	r := rest.Restful{}
 	_ = r.Init(router)
@@ -61,18 +59,15 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 	}
 	logger.Println("server on :", config.Conf.Port)
-	fmt.Println("server on :", config.Conf.Port)
 	if config.Conf.SSl.Enable {
 		go func() {
 			if err := server.ListenAndServeTLS(config.Conf.SSl.CertFile, config.Conf.SSl.KeyFile); err != nil && err != http.ErrServerClosed {
-				fmt.Printf("listen: %s\n", err)
 				logger.Fatalf("listen: %s\n", err)
 			}
 		}()
 	} else {
 		go func() {
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				fmt.Printf("listen: %s\n", err)
 				logger.Fatalf("listen: %s\n", err)
 			}
 		}()
