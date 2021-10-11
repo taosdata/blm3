@@ -1,5 +1,9 @@
-Debug = true
-Port = 6041
+debug = true
+port = 6041
+logLevel = "info"
+
 [opentsdb]
-Enable = true
-DB = "test_opentsdb"
+enable = true
+
+[influxdb]
+enable = true

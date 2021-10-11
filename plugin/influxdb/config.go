@@ -1,4 +1,4 @@
-package opentsdb
+package influxdb
 
 type Config struct {
 	Enable bool

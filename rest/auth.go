@@ -1,12 +1,13 @@
 package rest
 
 import (
-	"bytes"
 	"crypto/des"
 	"encoding/base64"
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/httperror"
+	"github.com/huskar-t/blm_demo/tools"
+	"github.com/huskar-t/blm_demo/tools/pool"
 	"net/http"
 	"strings"
 )
@@ -22,17 +23,6 @@ var desKey = []byte{
 	68,
 }
 
-func DecodeBasic(auth string) (user, password string, err error) {
-	b, err := base64.StdEncoding.DecodeString(auth)
-	if err != nil {
-		return "", "", err
-	}
-	sl := strings.Split(string(b), ":")
-	if len(sl) != 2 {
-		return "", "", errors.New("wrong basic auth")
-	}
-	return sl[0], sl[1], nil
-}
 func DecodeDes(auth string) (user, password string, err error) {
 	d, err := base64.StdEncoding.DecodeString(auth)
 	if err != nil {
@@ -45,14 +35,15 @@ func DecodeDes(auth string) (user, password string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	b := bytes.Buffer{}
+	b := pool.BytesPoolGet()
 	for i := 0; i < 6; i++ {
 		origData := make([]byte, 8)
 		block.Decrypt(origData, d[i*8:+(i+1)*8])
 		b.Write(origData)
 		if i == 2 {
 			user = b.String()
-			b = bytes.Buffer{}
+			pool.BytesPoolPut(b)
+			b = pool.BytesPoolGet()
 		}
 	}
 	password = b.String()
@@ -75,7 +66,8 @@ func EncodeDes(user, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	buf := bytes.Buffer{}
+	buf := pool.BytesPoolGet()
+	defer pool.BytesPoolPut(buf)
 	for i := 0; i < 6; i++ {
 		d := make([]byte, 8)
 		block.Encrypt(d, b[i*8:(i+1)*8])
@@ -97,7 +89,7 @@ func checkAuth(c *gin.Context) {
 	}
 	auth = strings.TrimSpace(auth)
 	if strings.HasPrefix(auth, "Basic") {
-		user, password, err := DecodeBasic(auth[6:])
+		user, password, err := tools.DecodeBasic(auth[6:])
 		if err != nil {
 			errorResponse(c, httperror.HTTP_INVALID_BASIC_AUTH)
 			return

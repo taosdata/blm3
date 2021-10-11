@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/httperror"
 	"github.com/huskar-t/blm_demo/log"
+	"github.com/huskar-t/blm_demo/tools/web"
 	"github.com/taosdata/driver-go/v2/common"
 	tErrors "github.com/taosdata/driver-go/v2/errors"
 	"github.com/taosdata/driver-go/v2/wrapper"
@@ -75,10 +76,12 @@ type TDEngineRestfulResp struct {
 func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	var taos unsafe.Pointer
 	var result unsafe.Pointer
+	id := web.GetRequestID(c)
+	logger := logger.WithField("sessionID", id)
 	defer func() {
 		err := recover()
 		if err != nil {
-			logger.Error(err)
+			logger.Errorln(err)
 		}
 		if result != nil {
 			wrapper.TaosFreeResult(result)
@@ -89,15 +92,18 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	}()
 	b, err := c.GetRawData()
 	if err != nil {
+		logger.WithError(err).Error("get request body error")
 		errorResponse(c, httperror.HTTP_INVALID_CONTENT_LENGTH)
 		return
 	}
 	if len(b) == 0 {
+		logger.Errorln("no msg got")
 		errorResponse(c, httperror.HTTP_NO_MSG_INPUT)
 		return
 	}
 	sql := strings.TrimSpace(string(b))
 	if len(sql) == 0 {
+		logger.Errorln("no sql got")
 		errorResponse(c, httperror.HTTP_NO_SQL_INPUT)
 		return
 	}
@@ -106,16 +112,24 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	password := c.MustGet(PasswordKey).(string)
 	taos, err = wrapper.TaosConnect("", user, password, "", 0)
 	if err != nil {
+		logger.WithError(err).Error("connect taosd error")
 		var tError *tErrors.TaosError
 		if errors.As(err, &tError) {
 			errorResponseWithMsg(c, int(tError.Code), tError.ErrStr)
 			return
+		} else {
+			errorResponseWithMsg(c, 0xffff, err.Error())
+			return
 		}
 	}
+	start := time.Now()
+	logger.Debugln(start, "start execute sql:", sql)
 	result = wrapper.TaosQuery(taos, sql)
+	logger.Debugln("execute sql finish cast:", time.Now().Sub(start))
 	code := wrapper.TaosError(result)
 	if code != httperror.SUCCESS {
 		errorMsg := wrapper.TaosErrorStr(result)
+		logger.Errorln("execute sql error:", sql, code&0xffff, errorMsg)
 		errorResponseWithMsg(c, int(code), errorMsg)
 		return
 	}
@@ -123,6 +137,7 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	if numFields == 0 {
 		// there are no select and show kinds of commands
 		affectedRows := wrapper.TaosAffectedRows(result)
+		logger.Debugln("execute sql success affected rows:", affectedRows)
 		c.JSON(http.StatusOK, &TDEngineRestfulResp{
 			Status:     "succ",
 			Head:       []string{"affected_rows"},
@@ -141,6 +156,7 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			d := wrapper.ReadBlockWithTimeFormat(result, block, blockSize, header.ColLength, header.ColTypes, timeFunc)
 			data = append(data, d...)
 		}
+		logger.Debugln("execute sql success return data rows:", len(data))
 		var columnMeta [][]interface{}
 		for i := 0; i < len(header.ColNames); i++ {
 			columnMeta = append(columnMeta, []interface{}{

@@ -1,0 +1,54 @@
+package log
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"net/http"
+	"sync/atomic"
+	"time"
+)
+
+func GinLog() gin.HandlerFunc {
+	logger := GetLogger("web")
+	id := uint32(0)
+	return func(c *gin.Context) {
+		currentID := atomic.AddUint32(&id, 1)
+		startTime := time.Now()
+		c.Set("currentID", currentID)
+		c.Set("startTime", startTime)
+		c.Next()
+		endTime := time.Now()
+		latencyTime := endTime.Sub(startTime)
+		reqMethod := c.Request.Method
+		reqUri := c.Request.RequestURI
+		statusCode := c.Writer.Status()
+		clientIP := c.ClientIP()
+		logger.WithField("sessionID", currentID).Infof("| %3d | %13v | %15s | %s | %s ",
+			statusCode,
+			latencyTime,
+			clientIP,
+			reqMethod,
+			reqUri,
+		)
+	}
+}
+
+type recoverLog struct {
+	logger logrus.FieldLogger
+}
+
+func (r *recoverLog) Write(p []byte) (n int, err error) {
+	logger.Errorln(p)
+	return len(p), nil
+}
+
+func GinRecoverLog() gin.HandlerFunc {
+	logger := GetLogger("web")
+	return func(c *gin.Context) {
+		id := c.MustGet("currentID").(uint32)
+		writer := &recoverLog{logger: logger.WithField("id", id)}
+		gin.RecoveryWithWriter(writer, func(c *gin.Context, err interface{}) {
+			c.AbortWithStatus(http.StatusInternalServerError)
+		})
+	}
+}

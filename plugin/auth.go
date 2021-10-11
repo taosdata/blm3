@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/tools"
+	"github.com/huskar-t/blm_demo/tools/pool"
 	"net/http"
 	"strings"
 )
@@ -115,13 +116,14 @@ func RegisterGenerateAuth(r gin.IRouter) {
 		base64.StdEncoding.Encode(l1, d)
 		l2 := make([]byte, base64.StdEncoding.EncodedLen(len(keyBytes)))
 		base64.StdEncoding.Encode(l2, keyBytes)
-		buf := bytes.Buffer{}
+		buf := pool.BytesPoolGet()
 		buf.Write(l1)
 		buf.WriteByte(':')
 		buf.Write(l2)
 		buf.WriteByte(':')
 		buf.WriteString("aes")
 		c.String(http.StatusOK, buf.String())
+		pool.BytesPoolPut(buf)
 	})
 }
 

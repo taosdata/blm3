@@ -27,10 +27,9 @@ func Register(plugin Plugin) {
 }
 
 func Init(r gin.IRouter) {
-	rr := r.Group("plugin")
 	for name, plugin := range plugins {
 		logger.Infof("init plugin %s", name)
-		router := rr.Group(name)
+		router := r.Group(name)
 		err := plugin.Init(router)
 		if err != nil {
 			logger.WithError(err).Panicf("init plugin %s", name)

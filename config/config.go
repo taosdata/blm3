@@ -1,63 +1,124 @@
 package config
 
 import (
-	"flag"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/taosdata/go-utils/util"
-	"github.com/taosdata/go-utils/web"
-	"io/ioutil"
-	"log"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"time"
 )
 
 type Config struct {
-	Cors     web.CorsConfig
+	Cors     CorsConfig
 	Debug    bool
 	Port     int
 	LogLevel string
-	P        toml.Primitive
+	SSl      SSl
+	Log      Log
+}
+
+type SSl struct {
+	Enable   bool
+	CertFile string
+	KeyFile  string
+}
+
+func initSSL() {
+	viper.SetDefault("ssl.enable", false)
+	_ = viper.BindEnv("ssl.enable", "BLM_SSL_ENABLE")
+	pflag.Bool("ssl.enable", false, `enable ssl. Env "BLM_SSL_ENABLE"`)
+
+	viper.SetDefault("ssl.certFile", "")
+	_ = viper.BindEnv("ssl.certFile", "BLM_SSL_CERT_FILE")
+	pflag.String("ssl.certFile", "", `ssl cert file path. Env "BLM_SSL_CERT_FILE"`)
+
+	viper.SetDefault("ssl.keyFile", "")
+	_ = viper.BindEnv("ssl.keyFile", "BLM_SSL_KEY_FILE")
+	pflag.String("ssl.keyFile", "", `ssl key file path. Env "BLM_SSL_KEY_FILE"`)
+}
+
+func (s *SSl) setValue() {
+	s.Enable = viper.GetBool("ssl.enable")
+	s.CertFile = viper.GetString("ssl.certFile")
+	s.KeyFile = viper.GetString("ssl.keyFile")
+}
+
+type Log struct {
+	Path          string
+	RotationCount uint
+	RotationTime  time.Duration
+}
+
+func initLog() {
+	viper.SetDefault("log.path", "/var/log/taos")
+	_ = viper.BindEnv("log.path", "BLM_LOG_PATH")
+	pflag.String("log.path", "/var/log/taos", `log path. Env "BLM_LOG_PATH"`)
+
+	viper.SetDefault("log.rotationCount", 30)
+	_ = viper.BindEnv("log.rotationCount", "BLM_LOG_ROTATION_COUNT")
+	pflag.Uint("log.rotationCount", 30, `log rotation count. Env "BLM_LOG_ROTATION_COUNT"`)
+
+	viper.SetDefault("log.rotationTime", time.Hour*24)
+	_ = viper.BindEnv("log.rotationTime", "BLM_LOG_ROTATION_TIME")
+	pflag.Duration("log.rotationTime", time.Hour*24, `log rotation time. Env "BLM_LOG_ROTATION_TIME"`)
+}
+
+func (l *Log) setValue() {
+	l.Path = viper.GetString("log.path")
+	l.RotationCount = viper.GetUint("log.rotationCount")
+	l.RotationTime = viper.GetDuration("log.rotationTime")
 }
 
 var (
-	Conf        *Config
-	configPath  = "./config/blm3.toml"
-	configBytes []byte
+	Conf *Config
 )
 
-func init() {
-	cp := flag.String("c", "", "default ./config/blm3.toml")
-	flag.Parse()
+func Init() {
+	viper.SetConfigType("toml")
+	viper.SetConfigName("blm")
+	viper.AddConfigPath("/etc/taos")
+	cp := pflag.StringP("config", "c", "", "config path default /etc/taos/blm.toml")
+	pflag.Parse()
 	if *cp != "" {
-		configPath = *cp
+		viper.SetConfigFile(*cp)
 	}
-	fmt.Println("load config :", configPath)
-	var conf Config
-	var err error
-	if util.PathExist(configPath) {
-		configBytes, err = ioutil.ReadFile(configPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = toml.Decode(string(configBytes), &conf)
-		if err != nil {
-			log.Fatal(err)
+	viper.SetEnvPrefix("blm")
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			fmt.Println("config file not found")
+		} else {
+			panic(err)
 		}
 	}
-	conf.Cors.Init()
-	if conf.Port == 0 {
-		conf.Port = 6041
+	Conf = &Config{
+		Debug:    viper.GetBool("debug"),
+		Port:     viper.GetInt("port"),
+		LogLevel: viper.GetString("logLevel"),
 	}
-	if conf.LogLevel == "" {
-		conf.LogLevel = "info"
-	}
-	Conf = &conf
+	Conf.Log.setValue()
+	Conf.Cors.setValue()
+	Conf.SSl.setValue()
 }
 
-func Decode(v interface{}) error {
-	_, err := toml.Decode(string(configBytes), v)
-	return err
-}
+//arg > file > env
+func init() {
+	viper.SetDefault("debug", false)
+	_ = viper.BindEnv("debug", "BLM_DEBUG")
+	pflag.Bool("debug", false, `enable debug mode. Env "BLM_DEBUG"`)
 
-func Clear() {
-	configBytes = nil
+	viper.SetDefault("port", 6041)
+	_ = viper.BindEnv("port", "BLM_PORT")
+	pflag.IntP("port", "p", 6041, `http port. Env "BLM_PORT"`)
+
+	viper.SetDefault("logLevel", "info")
+	_ = viper.BindEnv("logLevel", "BLM_LOG_LEVEL")
+	pflag.String("logLevel", "info", `log level (panic fatal error warn warning info debug trace). Env "BLM_LOG_LEVEL"`)
+
+	initLog()
+	InitCors()
+
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		panic(err)
+	}
 }

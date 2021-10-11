@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/gin"
 	"github.com/huskar-t/blm_demo/config"
+	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/plugin"
+	_ "github.com/huskar-t/blm_demo/plugin/influxdb"
 	_ "github.com/huskar-t/blm_demo/plugin/opentsdb"
 	"github.com/huskar-t/blm_demo/rest"
-	"github.com/taosdata/go-utils/web"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,14 +21,38 @@ import (
 	"time"
 )
 
+var logger = log.GetLogger("main")
+
+func createRouter(debug bool, corsConf *config.CorsConfig, enableGzip bool) *gin.Engine {
+	if debug {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	router := gin.New()
+	router.Use(log.GinLog())
+	router.Use(log.GinRecoverLog())
+	if debug {
+		pprof.Register(router)
+	}
+	if enableGzip {
+		router.Use(gzip.Gzip(gzip.DefaultCompression))
+	}
+	router.Use(cors.New(corsConf.GetConfig()))
+	return router
+}
+
 func main() {
-	router := web.CreateRouter(config.Conf.Debug, &config.Conf.Cors, false)
+	config.Init()
+	log.ConfigLog()
+	logger.Info("start server:", log.ServerID)
+	fmt.Println("start server:", log.ServerID)
+	router := createRouter(config.Conf.Debug, &config.Conf.Cors, false)
 	r := rest.Restful{}
 	_ = r.Init(router)
 	plugin.RegisterGenerateAuth(router)
 	plugin.Init(router)
 	plugin.Start()
-	config.Clear()
 	server := &http.Server{
 		Addr:              ":" + strconv.Itoa(config.Conf.Port),
 		Handler:           router,
@@ -32,25 +60,35 @@ func main() {
 		ReadTimeout:       200 * time.Second,
 		WriteTimeout:      30 * time.Second,
 	}
+	logger.Println("server on :", config.Conf.Port)
 	fmt.Println("server on :", config.Conf.Port)
-	go func() {
-		// 服务连接
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
-		}
-	}()
+	if config.Conf.SSl.Enable {
+		go func() {
+			if err := server.ListenAndServeTLS(config.Conf.SSl.CertFile, config.Conf.SSl.KeyFile); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("listen: %s\n", err)
+				logger.Fatalf("listen: %s\n", err)
+			}
+		}()
+	} else {
+		go func() {
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("listen: %s\n", err)
+				logger.Fatalf("listen: %s\n", err)
+			}
+		}()
+	}
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	<-quit
-	log.Println("Shutdown WebServer ...")
+	logger.Println("Shutdown WebServer ...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go func() {
 		if err := server.Shutdown(ctx); err != nil {
-			log.Println("WebServer Shutdown error:", err)
+			logger.Println("WebServer Shutdown error:", err)
 		}
 	}()
-	log.Println("Stop Plugins ...")
+	logger.Println("Stop Plugins ...")
 	ticker := time.NewTicker(time.Second * 5)
 	done := make(chan struct{})
 	go func() {
@@ -63,5 +101,5 @@ func main() {
 	case <-ticker.C:
 		break
 	}
-	log.Println("Server exiting")
+	logger.Println("Server exiting")
 }

@@ -1,22 +1,22 @@
 package opentsdb
 
 import (
-	"bufio"
-	"bytes"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/huskar-t/blm_demo/config"
-	"github.com/huskar-t/blm_demo/db"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/plugin"
+	"github.com/huskar-t/blm_demo/tools/web"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"github.com/taosdata/driver-go/v2/af"
-	"io"
 	"net/http"
+	"time"
 )
 
 var logger = log.GetLogger("opentsdb")
 
 type Plugin struct {
-	pool *db.AFConnectorPool
 	conf Config
 }
 
@@ -29,99 +29,135 @@ func (p *Plugin) Version() string {
 }
 
 func (p *Plugin) Init(r gin.IRouter) error {
-	err := config.Decode(&p.conf)
-	if err != nil {
-		return err
-	}
-	if !p.conf.OpenTSDB.Enable {
+	enable := viper.GetBool("opentsdb.enable")
+	p.conf = Config{Enable: enable}
+	if !p.conf.Enable {
 		logger.Info("opentsdb Disabled")
 		return nil
 	}
-	r.POST("put", plugin.Auth(p.errorResponse), p.insertJson)
-	r.POST("put/telnet", plugin.Auth(p.errorResponse), p.insertTelnet)
+	r.POST("put/:db", plugin.Auth(p.errorResponse), p.insertJson)
+	//r.POST("put/telnet/:db", plugin.Auth(p.errorResponse), p.insertTelnet)
 	return nil
 }
 
 func (p *Plugin) Start() error {
-	if !p.conf.OpenTSDB.Enable {
+	if !p.conf.Enable {
 		return nil
 	}
 	return nil
 }
 
 func (p *Plugin) Stop() error {
-	if !p.conf.OpenTSDB.Enable {
-		return nil
-	}
-	if p.pool != nil {
-		p.pool.Release()
-	}
 	return nil
 }
 
 func (p *Plugin) insertJson(c *gin.Context) {
+	id := web.GetRequestID(c)
+	logger := logger.WithField("sessionID", id)
+	db := c.Param("db")
+	if len(db) == 0 {
+		logger.Errorln("db required")
+		p.errorResponse(c, http.StatusBadRequest, errors.New("db required"))
+		return
+	}
 	data, err := c.GetRawData()
 	if err != nil {
+		logger.WithError(err).Error("get request body error")
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
 	user, password, err := plugin.GetAuth(c)
 	if err != nil {
+		logger.WithError(err).Error("get auth error")
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	conn, err := af.Open("", user, password, p.conf.OpenTSDB.DB, 0)
+	conn, err := af.Open("", user, password, "", 0)
 	if err != nil {
+		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
 	defer conn.Close()
-	err = conn.InsertJsonPayload(string(data))
+	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
+		logger.WithError(err).Error("create database error", db)
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	_, err = conn.Exec(fmt.Sprintf("use %s", db))
+	if err != nil {
+		logger.WithError(err).Error("change to database error", db)
+		p.errorResponse(c, http.StatusInternalServerError, err)
+		return
+	}
+	start := time.Now()
+	logger.Debug(start, "insert json payload", string(data))
+	err = conn.InsertJsonPayload(string(data))
+	logger.Debug("insert json payload cast:", time.Now().Sub(start))
+	if err != nil {
+		logger.WithError(err).Error("insert json payload error", string(data))
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
 	p.successResponse(c)
 }
 
-func (p *Plugin) insertTelnet(c *gin.Context) {
-	rd := bufio.NewReader(c.Request.Body)
-	var lines []string
-	tmp := new(bytes.Buffer)
-	for {
-		l, hasNext, err := rd.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				p.errorResponse(c, http.StatusBadRequest, err)
-				return
-			}
-		}
-		tmp.Write(l)
-		if !hasNext {
-			lines = append(lines, tmp.String())
-			tmp = new(bytes.Buffer)
-		}
-	}
-	user, password, err := plugin.GetAuth(c)
-	if err != nil {
-		p.errorResponse(c, http.StatusBadRequest, err)
-		return
-	}
-	conn, err := af.Open("", user, password, p.conf.OpenTSDB.DB, 0)
-	if err != nil {
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
-	}
-	defer conn.Close()
-	err = conn.InsertTelnetLines(lines)
-	if err != nil {
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
-	}
-	p.successResponse(c)
-}
+//func (p *Plugin) insertTelnet(c *gin.Context) {
+//	db := c.Param("db")
+//	if len(db) == 0 {
+//		p.errorResponse(c, http.StatusBadRequest, errors.New("db required"))
+//		return
+//	}
+//	rd := bufio.NewReader(c.Request.Body)
+//	var lines []string
+//	tmp := pool.BytesPoolGet()
+//	defer pool.BytesPoolPut(tmp)
+//	for {
+//		l, hasNext, err := rd.ReadLine()
+//		if err != nil {
+//			if err == io.EOF {
+//				break
+//			} else {
+//				p.errorResponse(c, http.StatusBadRequest, err)
+//				return
+//			}
+//		}
+//		tmp.Write(l)
+//		if !hasNext {
+//			lines = append(lines, tmp.String())
+//			tmp.Reset()
+//		}
+//	}
+//
+//	user, password, err := plugin.GetAuth(c)
+//	if err != nil {
+//		p.errorResponse(c, http.StatusUnauthorized, err)
+//		return
+//	}
+//	conn, err := af.Open("", user, password, "", 0)
+//	if err != nil {
+//		p.errorResponse(c, http.StatusInternalServerError, err)
+//		return
+//	}
+//	defer conn.Close()
+//	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
+//	if err != nil {
+//		p.errorResponse(c, http.StatusInternalServerError, err)
+//		return
+//	}
+//	_, err = conn.Exec(fmt.Sprintf("use %s", db))
+//	if err != nil {
+//		p.errorResponse(c, http.StatusInternalServerError, err)
+//		return
+//	}
+//	err = conn.InsertTelnetLines(lines)
+//	if err != nil {
+//		p.errorResponse(c, http.StatusInternalServerError, err)
+//		return
+//	}
+//	p.successResponse(c)
+//}
 
 type message struct {
 	Code    int    `json:"code"`
@@ -140,6 +176,9 @@ func (p *Plugin) successResponse(c *gin.Context) {
 }
 
 func init() {
+	_ = viper.BindEnv("opentsdb.enable", "BLM_OPENTSDB_ENABLE")
+	pflag.Bool("opentsdb.enable", true, `enable opentsdb. Env "BLM_OPENTSDB_ENABLE"`)
+	viper.SetDefault("opentsdb.enable", true)
 	plugin.Register(&Plugin{
 		conf: Config{},
 	})
