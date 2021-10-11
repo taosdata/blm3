@@ -42,12 +42,10 @@ func (f *FileHook) Fire(entry *logrus.Entry) error {
 }
 
 func ConfigLog() {
-	l, err := logrus.ParseLevel(config.Conf.LogLevel)
+	err := SetLevel(config.Conf.LogLevel)
 	if err != nil {
 		panic(err)
 	}
-	logger.SetLevel(l)
-
 	writer, err := rotatelogs.New(
 		path.Join(config.Conf.Log.Path, "blm_%Y_%m_%d_%H_%M.log"),
 		rotatelogs.WithRotationCount(config.Conf.Log.RotationCount),
@@ -58,6 +56,15 @@ func ConfigLog() {
 	}
 	hook := NewFileHook(globalLogFormatter, writer)
 	logger.AddHook(hook)
+}
+
+func SetLevel(level string) error {
+	l, err := logrus.ParseLevel(level)
+	if err != nil {
+		return err
+	}
+	logger.SetLevel(l)
+	return nil
 }
 
 func GetLogger(model string) *logrus.Entry {

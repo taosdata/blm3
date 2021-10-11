@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	dbPackage "github.com/huskar-t/blm_demo/db"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/plugin"
 	"github.com/huskar-t/blm_demo/tools/pool"
@@ -20,7 +21,8 @@ import (
 var logger = log.GetLogger("opentsdb")
 
 type Plugin struct {
-	conf Config
+	conf        Config
+	reserveConn *af.Connector
 }
 
 func (p *Plugin) String() string {
@@ -81,7 +83,11 @@ func (p *Plugin) insertJson(c *gin.Context) {
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if !dbPackage.CloseAfConn(conn) {
+			p.reserveConn = conn
+		}
+	}()
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
 		logger.WithError(err).Error("create database error", db)
@@ -148,7 +154,11 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if !dbPackage.CloseAfConn(conn) {
+			p.reserveConn = conn
+		}
+	}()
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
 		logger.WithError(err).Error("create database error", db)

@@ -4,9 +4,11 @@ import (
 	"database/sql/driver"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/huskar-t/blm_demo/db"
 	"github.com/huskar-t/blm_demo/httperror"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/tools/web"
+	"github.com/sirupsen/logrus"
 	"github.com/taosdata/driver-go/v2/common"
 	tErrors "github.com/taosdata/driver-go/v2/errors"
 	"github.com/taosdata/driver-go/v2/wrapper"
@@ -23,6 +25,7 @@ const LayoutNanoSecond = "2006-01-02 15:04:05.000000000"
 var logger = log.GetLogger("restful")
 
 type Restful struct {
+	reserveConn unsafe.Pointer
 }
 
 func (ctl *Restful) Init(r gin.IRouter) error {
@@ -40,7 +43,7 @@ func (ctl *Restful) sql(c *gin.Context) {
 	}
 	switch n {
 	case "sql":
-		doQuery(c, func(ts int64, precision int) driver.Value {
+		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
 			switch precision {
 			case common.PrecisionMilliSecond:
 				return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutMillSecond)
@@ -52,11 +55,11 @@ func (ctl *Restful) sql(c *gin.Context) {
 			panic("unsupported precision")
 		})
 	case "sqlt":
-		doQuery(c, func(ts int64, precision int) driver.Value {
+		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
 			return ts
 		})
 	case "sqlutc":
-		doQuery(c, func(ts int64, precision int) driver.Value {
+		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
 			return common.TimestampConvertToTime(ts, precision).Format(time.RFC3339Nano)
 		})
 	default:
@@ -73,9 +76,11 @@ type TDEngineRestfulResp struct {
 	Rows       int              `json:"rows"`
 }
 
-func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
+func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	var taos unsafe.Pointer
 	var result unsafe.Pointer
+	var s time.Time
+	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
 	defer func() {
@@ -87,7 +92,13 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			wrapper.TaosFreeResult(result)
 		}
 		if taos != nil {
-			wrapper.TaosClose(taos)
+			if isDebug {
+				s = time.Now()
+			}
+			if !db.CloseConn(taos) {
+				ctl.reserveConn = taos
+			}
+			logger.Debugln("taos close connect cost:", time.Now().Sub(s))
 		}
 	}()
 	b, err := c.GetRawData()
@@ -107,10 +118,13 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 		errorResponse(c, httperror.HTTP_NO_SQL_INPUT)
 		return
 	}
-
 	user := c.MustGet(UserKey).(string)
 	password := c.MustGet(PasswordKey).(string)
+	if isDebug {
+		s = time.Now()
+	}
 	taos, err = wrapper.TaosConnect("", user, password, "", 0)
+	logger.Debugln("taos connect cost:", time.Now().Sub(s))
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		var tError *tErrors.TaosError
@@ -122,15 +136,23 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			return
 		}
 	}
-	start := time.Now()
-	logger.Debugln(start, "start execute sql:", sql)
+	startExec := time.Now()
+	logger.Debugln(startExec, "start execute sql:", sql)
 	result = wrapper.TaosQuery(taos, sql)
-	logger.Debugln("execute sql finish cast:", time.Now().Sub(start))
+	logger.Debugln("execute sql cast:", time.Now().Sub(startExec))
+	if isDebug {
+		s = time.Now()
+	}
 	code := wrapper.TaosError(result)
+	logger.Debugln("taos get error cost:", time.Now().Sub(s))
 	if code != httperror.SUCCESS {
+		if isDebug {
+			s = time.Now()
+		}
 		errorMsg := wrapper.TaosErrorStr(result)
-		logger.Errorln("execute sql error:", sql, code&0xffff, errorMsg)
-		errorResponseWithMsg(c, int(code), errorMsg)
+		logger.Debugln("taos get error string cost:", time.Now().Sub(s))
+		logger.Errorln("taos execute sql error:", sql, code&0xffff, errorMsg)
+		errorResponseWithMsg(c, code, errorMsg)
 		return
 	}
 	numFields := wrapper.TaosFieldCount(result)
@@ -146,8 +168,15 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			Rows:       1,
 		})
 	} else {
+		if isDebug {
+			s = time.Now()
+		}
 		header, _ := wrapper.ReadColumn(result, numFields)
+		logger.Debugln("taos read column cost:", time.Now().Sub(s))
 		var data = make([][]driver.Value, 0)
+		if isDebug {
+			s = time.Now()
+		}
 		for {
 			blockSize, block := wrapper.TaosFetchBlock(result)
 			if blockSize == 0 {
@@ -156,7 +185,7 @@ func doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			d := wrapper.ReadBlockWithTimeFormat(result, block, blockSize, header.ColLength, header.ColTypes, timeFunc)
 			data = append(data, d...)
 		}
-		logger.Debugln("execute sql success return data rows:", len(data))
+		logger.Debugln("execute sql success return data rows:", len(data), ",cost:", time.Now().Sub(s))
 		var columnMeta [][]interface{}
 		for i := 0; i < len(header.ColNames); i++ {
 			columnMeta = append(columnMeta, []interface{}{
@@ -192,4 +221,10 @@ func (ctl *Restful) des(c *gin.Context) {
 		Code:   0,
 		Desc:   token,
 	})
+}
+
+func (ctl *Restful) Close() {
+	if ctl.reserveConn != nil {
+		wrapper.TaosClose(ctl.reserveConn)
+	}
 }

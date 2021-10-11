@@ -17,8 +17,7 @@ func GinLog() gin.HandlerFunc {
 		c.Set("currentID", currentID)
 		c.Set("startTime", startTime)
 		c.Next()
-		endTime := time.Now()
-		latencyTime := endTime.Sub(startTime)
+		latencyTime := time.Now().Sub(startTime)
 		reqMethod := c.Request.Method
 		reqUri := c.Request.RequestURI
 		statusCode := c.Writer.Status()

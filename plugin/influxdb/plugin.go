@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	dbPackage "github.com/huskar-t/blm_demo/db"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/plugin"
 	"github.com/huskar-t/blm_demo/tools"
@@ -15,15 +16,14 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 )
 
 var logger = log.GetLogger("influxdb")
 
 type Influxdb struct {
-	conf    Config
-	builtDB sync.Map
+	conf        Config
+	reserveConn *af.Connector
 }
 
 func (p *Influxdb) String() string {
@@ -53,6 +53,9 @@ func (p *Influxdb) Start() error {
 }
 
 func (p *Influxdb) Stop() error {
+	if p.reserveConn != nil {
+		p.reserveConn.Close()
+	}
 	return nil
 }
 
@@ -116,7 +119,11 @@ func (p *Influxdb) write(c *gin.Context) {
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if !dbPackage.CloseAfConn(conn) {
+			p.reserveConn = conn
+		}
+	}()
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns'", db))
 	if err != nil {
 		logger.WithError(err).Errorln("create database error", db)

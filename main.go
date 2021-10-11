@@ -46,6 +46,19 @@ func main() {
 	log.ConfigLog()
 	logger.Info("start server:", log.ServerID)
 	router := createRouter(config.Conf.Debug, &config.Conf.Cors, false)
+	router.POST("logModel", func(c *gin.Context) {
+		body, err := c.GetRawData()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		err = log.SetLevel(string(body))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, err)
+			return
+		}
+		c.JSON(http.StatusOK, body)
+	})
 	r := rest.Restful{}
 	_ = r.Init(router)
 	plugin.RegisterGenerateAuth(router)
@@ -87,6 +100,7 @@ func main() {
 	ticker := time.NewTicker(time.Second * 5)
 	done := make(chan struct{})
 	go func() {
+		r.Close()
 		plugin.Stop()
 		close(done)
 	}()
