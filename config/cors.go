@@ -39,7 +39,7 @@ func (conf *CorsConfig) GetConfig() cors.Config {
 	return corsConfig
 }
 
-func InitCors() {
+func initCors() {
 	viper.SetDefault("cors.allowAllOrigins", false)
 	_ = viper.BindEnv("cors.allowAllOrigins", "BLM_CORS_ALLOW_ALL_ORIGINS")
 	pflag.Bool("cors.allowAllOrigins", false, `cors allow all origins. Env "BLM_CORS_ALLOW_ALL_ORIGINS"`)

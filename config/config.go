@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"runtime"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Config struct {
 	LogLevel string
 	SSl      SSl
 	Log      Log
+	Pool     Pool
 }
 
 type SSl struct {
@@ -40,6 +42,33 @@ func (s *SSl) setValue() {
 	s.Enable = viper.GetBool("ssl.enable")
 	s.CertFile = viper.GetString("ssl.certFile")
 	s.KeyFile = viper.GetString("ssl.keyFile")
+}
+
+type Pool struct {
+	MaxConnect  int
+	MaxIdle     int
+	IdleTimeout time.Duration
+}
+
+func initPool() {
+	viper.SetDefault("pool.maxConnect", runtime.NumCPU()*2+5)
+	_ = viper.BindEnv("pool.maxConnect", "BLM_POOL_MAX_CONNECT")
+	pflag.Int("pool.maxConnect", runtime.NumCPU()*2+5, `max connections to taosd. Env "BLM_POOL_MAX_CONNECT"`)
+
+	viper.SetDefault("pool.maxIdle", 5)
+	_ = viper.BindEnv("pool.maxIdle", "BLM_POOL_MAX_IDLE")
+	pflag.Int("pool.maxIdle", 5, `max idle connections to taosd. Env "BLM_POOL_MAX_IDLE"`)
+
+	viper.SetDefault("pool.idleTimeout", time.Minute)
+	_ = viper.BindEnv("pool.idleTimeout", "BLM_POOL_IDLE_TIMEOUT")
+	pflag.Duration("pool.idleTimeout", time.Minute, `Set idle connection timeout. Env "BLM_POOL_IDLE_TIMEOUT"`)
+
+}
+
+func (p *Pool) setValue() {
+	p.MaxConnect = viper.GetInt("pool.maxConnect")
+	p.MaxIdle = viper.GetInt("pool.maxIdle")
+	p.IdleTimeout = viper.GetDuration("pool.idleTimeout")
 }
 
 type Log struct {
@@ -98,6 +127,7 @@ func Init() {
 	Conf.Log.setValue()
 	Conf.Cors.setValue()
 	Conf.SSl.setValue()
+	Conf.Pool.setValue()
 }
 
 //arg > file > env
@@ -115,7 +145,8 @@ func init() {
 	pflag.String("logLevel", "info", `log level (panic fatal error warn warning info debug trace). Env "BLM_LOG_LEVEL"`)
 
 	initLog()
-	InitCors()
+	initCors()
+	initPool()
 
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {

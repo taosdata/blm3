@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"github.com/gin-gonic/gin"
-	"github.com/huskar-t/blm_demo/db"
+	dbPackage "github.com/huskar-t/blm_demo/db"
 	"github.com/huskar-t/blm_demo/httperror"
 	"github.com/huskar-t/blm_demo/log"
 	"github.com/huskar-t/blm_demo/tools/web"
@@ -77,28 +77,14 @@ type TDEngineRestfulResp struct {
 }
 
 func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
-	var taos unsafe.Pointer
 	var result unsafe.Pointer
 	var s time.Time
 	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
 	defer func() {
-		err := recover()
-		if err != nil {
-			logger.Errorln(err)
-		}
 		if result != nil {
 			wrapper.TaosFreeResult(result)
-		}
-		if taos != nil {
-			if isDebug {
-				s = time.Now()
-			}
-			if !db.CloseConn(taos) {
-				ctl.reserveConn = taos
-			}
-			logger.Debugln("taos close connect cost:", time.Now().Sub(s))
 		}
 	}()
 	b, err := c.GetRawData()
@@ -123,7 +109,8 @@ func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	if isDebug {
 		s = time.Now()
 	}
-	taos, err = wrapper.TaosConnect("", user, password, "", 0)
+	taosConnect, err := dbPackage.GetConnection(user, password)
+
 	logger.Debugln("taos connect cost:", time.Now().Sub(s))
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
@@ -136,9 +123,19 @@ func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 			return
 		}
 	}
+	defer func() {
+		if isDebug {
+			s = time.Now()
+		}
+		err := taosConnect.Put()
+		if err != nil {
+			panic(err)
+		}
+		logger.Debugln("taos put connect cost:", time.Now().Sub(s))
+	}()
 	startExec := time.Now()
 	logger.Debugln(startExec, "start execute sql:", sql)
-	result = wrapper.TaosQuery(taos, sql)
+	result = wrapper.TaosQuery(taosConnect.TaosConnection, sql)
 	logger.Debugln("execute sql cast:", time.Now().Sub(startExec))
 	if isDebug {
 		s = time.Now()

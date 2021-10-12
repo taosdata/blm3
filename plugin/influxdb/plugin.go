@@ -113,17 +113,14 @@ func (p *Influxdb) write(c *gin.Context) {
 		})
 		return
 	}
-	conn, err := af.Open("", user, password, "", 0)
+	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Errorln("connect taosd error")
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
-	defer func() {
-		if !dbPackage.CloseAfConn(conn) {
-			p.reserveConn = conn
-		}
-	}()
+	defer taosConn.Put()
+	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns'", db))
 	if err != nil {
 		logger.WithError(err).Errorln("create database error", db)

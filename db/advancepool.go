@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql/driver"
 	"github.com/huskar-t/blm_demo/config"
 	"github.com/silenceper/pool"
 	"github.com/taosdata/driver-go/v2/af"
@@ -10,19 +9,19 @@ import (
 	"unsafe"
 )
 
-type ConnectorPool struct {
+type AdvancePool struct {
 	user     string
 	password string
 	pool     pool.Pool
 }
 
-func NewConnectorPool(user, password string) (*ConnectorPool, error) {
+func NewAdvancePool(user, password string) (*AdvancePool, error) {
 	conn, err := wrapper.TaosConnect("", user, password, "", 0)
 	if err != nil {
 		return nil, err
 	}
 	defer wrapper.TaosClose(conn)
-	a := &ConnectorPool{user: user, password: password}
+	a := &AdvancePool{user: user, password: password}
 	poolConfig := &pool.Config{
 		InitialCap:  1,
 		MaxCap:      config.Conf.Pool.MaxConnect,
@@ -39,84 +38,72 @@ func NewConnectorPool(user, password string) (*ConnectorPool, error) {
 	return a, nil
 }
 
-func (a *ConnectorPool) factory() (interface{}, error) {
-	return wrapper.TaosConnect("", a.user, a.password, "", 0)
+func (a *AdvancePool) factory() (interface{}, error) {
+	taos, err := wrapper.TaosConnect("", a.user, a.password, "", 0)
+	if err != nil {
+		return nil, err
+	}
+	return af.NewConnector(taos)
 }
 
-func (a *ConnectorPool) close(v interface{}) error {
+func (a *AdvancePool) close(v interface{}) error {
 	if v != nil {
-		wrapper.TaosClose(v.(unsafe.Pointer))
+		return v.(*af.Connector).Close()
 	}
 	return nil
 }
 
-func (a *ConnectorPool) Get() (unsafe.Pointer, error) {
+func (a *AdvancePool) Get() (*af.Connector, error) {
 	v, err := a.pool.Get()
 	if err != nil {
 		return nil, err
 	}
-	return v.(unsafe.Pointer), nil
+	return v.(*af.Connector), nil
 }
 
-func (a *ConnectorPool) Put(c unsafe.Pointer) error {
-	conn, _ := af.NewConnector(c)
-	rows, err := conn.Query("select database()")
-	if err != nil {
-		a.pool.Close(c)
-		return err
-	}
-	defer rows.Close()
-	values := make([]driver.Value, 1)
-	err = rows.Next(values)
-	if err != nil {
-		a.pool.Close(c)
-		return err
-	}
-	if values[0] != nil {
-		return a.pool.Close(c)
-	}
+func (a *AdvancePool) Put(c *af.Connector) error {
 	return a.pool.Put(c)
 }
 
-func (a *ConnectorPool) Close(c unsafe.Pointer) error {
+func (a *AdvancePool) Close(c unsafe.Pointer) error {
 	return a.pool.Close(c)
 }
 
-func (a *ConnectorPool) Release() {
+func (a *AdvancePool) Release() {
 	a.pool.Release()
 }
 
-func (a *ConnectorPool) verifyPassword(password string) bool {
+func (a *AdvancePool) verifyPassword(password string) bool {
 	return password == a.password
 }
 
-var connectionMap = sync.Map{}
+var advanceConnectionMap = sync.Map{}
 
-type Conn struct {
-	TaosConnection unsafe.Pointer
-	pool           *ConnectorPool
+type AdvanceConn struct {
+	TaosConnection *af.Connector
+	pool           *AdvancePool
 }
 
-func (c *Conn) Put() error {
+func (c *AdvanceConn) Put() error {
 	return c.pool.Put(c.TaosConnection)
 }
 
-func GetConnection(user, password string) (*Conn, error) {
-	p, exist := connectionMap.Load(user)
+func GetAdvanceConnection(user, password string) (*AdvanceConn, error) {
+	p, exist := advanceConnectionMap.Load(user)
 	if exist {
-		connectionPool := p.(*ConnectorPool)
+		connectionPool := p.(*AdvancePool)
 		if !connectionPool.verifyPassword(password) {
-			newPool, err := NewConnectorPool(user, password)
+			newPool, err := NewAdvancePool(user, password)
 			if err != nil {
 				return nil, err
 			}
 			connectionPool.Release()
-			connectionMap.Store(user, newPool)
+			advanceConnectionMap.Store(user, newPool)
 			c, err := newPool.Get()
 			if err != nil {
 				return nil, err
 			}
-			return &Conn{
+			return &AdvanceConn{
 				TaosConnection: c,
 				pool:           newPool,
 			}, nil
@@ -125,13 +112,13 @@ func GetConnection(user, password string) (*Conn, error) {
 			if err != nil {
 				return nil, err
 			}
-			return &Conn{
+			return &AdvanceConn{
 				TaosConnection: c,
 				pool:           connectionPool,
 			}, nil
 		}
 	} else {
-		newPool, err := NewConnectorPool(user, password)
+		newPool, err := NewAdvancePool(user, password)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +127,7 @@ func GetConnection(user, password string) (*Conn, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Conn{
+		return &AdvanceConn{
 			TaosConnection: c,
 			pool:           newPool,
 		}, nil

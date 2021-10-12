@@ -77,17 +77,14 @@ func (p *Plugin) insertJson(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	conn, err := af.Open("", user, password, "", 0)
+	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer func() {
-		if !dbPackage.CloseAfConn(conn) {
-			p.reserveConn = conn
-		}
-	}()
+	defer taosConn.Put()
+	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
 		logger.WithError(err).Error("create database error", db)
@@ -148,17 +145,14 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	conn, err := af.Open("", user, password, "", 0)
+	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer func() {
-		if !dbPackage.CloseAfConn(conn) {
-			p.reserveConn = conn
-		}
-	}()
+	defer taosConn.Put()
+	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
 		logger.WithError(err).Error("create database error", db)
