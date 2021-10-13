@@ -1,0 +1,19 @@
+debug = true
+port = 6041
+logLevel = "debug"
+
+[ssl]
+enable = false
+certFile = ""
+keyFile = ""
+
+[log]
+path = "/var/log/taos"
+rotationCount = 30
+rotationTime = "24h"
+
+[opentsdb]
+enable = true
+
+[influxdb]
+enable = true
