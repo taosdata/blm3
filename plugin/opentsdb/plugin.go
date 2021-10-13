@@ -10,8 +10,6 @@ import (
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/pool"
 	"github.com/taosdata/blm3/tools/web"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/taosdata/driver-go/v2/af"
 	"io"
 	"net/http"
@@ -34,10 +32,9 @@ func (p *Plugin) Version() string {
 }
 
 func (p *Plugin) Init(r gin.IRouter) error {
-	enable := viper.GetBool("opentsdb.enable")
-	p.conf = Config{Enable: enable}
+	p.conf.setValue()
 	if !p.conf.Enable {
-		logger.Info("opentsdb Disabled")
+		logger.Info("opentsdb disabled")
 		return nil
 	}
 	r.POST("put/json/:db", plugin.Auth(p.errorResponse), p.insertJson)
@@ -194,10 +191,5 @@ func (p *Plugin) successResponse(c *gin.Context) {
 }
 
 func init() {
-	_ = viper.BindEnv("opentsdb.enable", "BLM_OPENTSDB_ENABLE")
-	pflag.Bool("opentsdb.enable", true, `enable opentsdb. Env "BLM_OPENTSDB_ENABLE"`)
-	viper.SetDefault("opentsdb.enable", true)
-	plugin.Register(&Plugin{
-		conf: Config{},
-	})
+	plugin.Register(&Plugin{})
 }
