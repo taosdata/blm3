@@ -17,3 +17,27 @@ enable = true
 
 [influxdb]
 enable = true
+
+[collectd]
+enable = true
+port = 25826
+db = "collectd"
+user = "root"
+password = "taosdata"
+
+[statsd]
+enable = true
+port = 8125
+db = "statsd"
+user = "root"
+password = "taosdata"
+worker = 10
+gatherInterval = "20s"
+protocol = "udp"
+maxTCPConnections = 250
+tcpKeepAlive = false
+allowPendingMessages = 10000
+deleteCounters = true
+deleteGauges = true
+deleteSets = true
+deleteTimings = true

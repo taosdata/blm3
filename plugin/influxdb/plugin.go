@@ -10,8 +10,6 @@ import (
 	"github.com/taosdata/blm3/tools"
 	"github.com/taosdata/blm3/tools/pool"
 	"github.com/taosdata/blm3/tools/web"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/taosdata/driver-go/v2/af"
 	"io"
 	"net/http"
@@ -35,10 +33,9 @@ func (p *Influxdb) Version() string {
 }
 
 func (p *Influxdb) Init(r gin.IRouter) error {
-	enable := viper.GetBool("influxdb.enable")
-	p.conf = Config{Enable: enable}
+	p.conf.setValue()
 	if !p.conf.Enable {
-		logger.Info("influxdb Disabled")
+		logger.Info("influxdb disabled")
 		return nil
 	}
 	r.POST("write", getAuth, p.write)
@@ -54,7 +51,7 @@ func (p *Influxdb) Start() error {
 
 func (p *Influxdb) Stop() error {
 	if p.reserveConn != nil {
-		p.reserveConn.Close()
+		return p.reserveConn.Close()
 	}
 	return nil
 }
@@ -188,10 +185,5 @@ func getAuth(c *gin.Context) {
 }
 
 func init() {
-	_ = viper.BindEnv("influxdb.enable", "BLM_INFLUXDB_ENABLE")
-	pflag.Bool("influxdb.enable", true, `enable influxdb. Env "BLM_INFLUXDB_ENABLE"`)
-	viper.SetDefault("influxdb.enable", true)
-	plugin.Register(&Influxdb{
-		conf: Config{},
-	})
+	plugin.Register(&Influxdb{})
 }

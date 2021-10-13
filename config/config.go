@@ -111,6 +111,10 @@ func Init() {
 		viper.SetConfigFile(*cp)
 	}
 	viper.SetEnvPrefix("blm")
+	err := viper.BindPFlags(pflag.CommandLine)
+	if err != nil {
+		panic(err)
+	}
 	viper.AutomaticEnv()
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -145,6 +149,7 @@ func init() {
 	pflag.String("logLevel", "info", `log level (panic fatal error warn warning info debug trace). Env "BLM_LOG_LEVEL"`)
 
 	initLog()
+	initSSL()
 	initCors()
 	initPool()
 
