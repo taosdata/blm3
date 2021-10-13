@@ -2,8 +2,8 @@ package log
 
 import (
 	"fmt"
-	"github.com/huskar-t/blm_demo/config"
-	"github.com/huskar-t/blm_demo/tools/pool"
+	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/tools/pool"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/sirupsen/logrus"
 	"io"

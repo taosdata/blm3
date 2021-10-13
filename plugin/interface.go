@@ -3,7 +3,7 @@ package plugin
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/huskar-t/blm_demo/log"
+	"github.com/taosdata/blm3/log"
 )
 
 var logger = log.GetLogger("plugin")

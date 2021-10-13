@@ -6,12 +6,12 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
-	"github.com/huskar-t/blm_demo/config"
-	"github.com/huskar-t/blm_demo/log"
-	"github.com/huskar-t/blm_demo/plugin"
-	_ "github.com/huskar-t/blm_demo/plugin/influxdb"
-	_ "github.com/huskar-t/blm_demo/plugin/opentsdb"
-	"github.com/huskar-t/blm_demo/rest"
+	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/log"
+	"github.com/taosdata/blm3/plugin"
+	_ "github.com/taosdata/blm3/plugin/influxdb"
+	_ "github.com/taosdata/blm3/plugin/opentsdb"
+	"github.com/taosdata/blm3/rest"
 	"net/http"
 	"os"
 	"os/signal"
@@ -46,19 +46,6 @@ func main() {
 	log.ConfigLog()
 	logger.Info("start server:", log.ServerID)
 	router := createRouter(config.Conf.Debug, &config.Conf.Cors, false)
-	router.POST("logModel", func(c *gin.Context) {
-		body, err := c.GetRawData()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
-		}
-		err = log.SetLevel(string(body))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
-			return
-		}
-		c.JSON(http.StatusOK, body)
-	})
 	r := rest.Restful{}
 	_ = r.Init(router)
 	plugin.RegisterGenerateAuth(router)

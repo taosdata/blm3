@@ -1,4 +1,4 @@
-module github.com/huskar-t/blm_demo
+module github.com/taosdata/blm3
 
 go 1.14
 

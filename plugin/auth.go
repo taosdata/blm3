@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"github.com/gin-gonic/gin"
-	"github.com/huskar-t/blm_demo/tools"
-	"github.com/huskar-t/blm_demo/tools/pool"
+	"github.com/taosdata/blm3/tools"
+	"github.com/taosdata/blm3/tools/pool"
 	"net/http"
 	"strings"
 )

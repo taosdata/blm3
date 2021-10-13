@@ -2,7 +2,7 @@ package db
 
 import (
 	"database/sql/driver"
-	"github.com/huskar-t/blm_demo/config"
+	"github.com/taosdata/blm3/config"
 	"github.com/silenceper/pool"
 	"github.com/taosdata/driver-go/v2/af"
 	"github.com/taosdata/driver-go/v2/wrapper"
