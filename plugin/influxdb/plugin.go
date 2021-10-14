@@ -3,6 +3,12 @@ package influxdb
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	dbPackage "github.com/taosdata/blm3/db"
 	"github.com/taosdata/blm3/log"
@@ -11,10 +17,7 @@ import (
 	"github.com/taosdata/blm3/tools/pool"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/af"
-	"io"
-	"net/http"
-	"strings"
-	"time"
+	"github.com/taosdata/driver-go/v2/errors"
 )
 
 var logger = log.GetLogger("influxdb")
@@ -56,6 +59,20 @@ func (p *Influxdb) Stop() error {
 	return nil
 }
 
+func min(l int, r int) int {
+	if l < r {
+		return l
+	}
+	return r
+}
+
+var reKeys = regexp.MustCompile(`([ ,])(abort|create|ignore|null|star|account|ctime|immediate|of|state|accounts|database|import|offset|statement|add|databases|in|or|state_window|after|days|initially|order|storage|all|dbs|insert|partitions|stream|alter|deferred|instead|pass|streams|and|delimiters|int|plus|string|as|desc|integer|pps|syncdb|asc|describe|interval|precision|table|attach|detach|into|prev|tables|before|distinct|is|privilege|tag|begin|divide|isnull|qtime|tags|between|dnode|join|queries|tbname|bigint|dnodes|keep|query|times|binary|dot|key|quorum|timestamp|bitand|double|kill|raise|tinyint|bitnot|drop|le|rem|topic|bitor|each|like|replace|topics|blocks|end|limit|replica|trigger|bool|eq|linear|reset|tseries|by|exists|local|restrict|uminus|cache|explain|lp|row|union|cachelast|fail|lshift|rp|unsigned|cascade|file|lt|rshift|update|change|fill|match|scores|uplus|cluster|float|maxrows|select|use|colon|for|minrows|semi|user|column|from|minus|session|users|comma|fsync|mnodes|set|using|comp|ge|modify|show|values|compact|glob|modules|slash|variable|concat|grants|nchar|sliding|variables|conflict|group|ne|slimit|vgroups|connection|gt|none|smallint|view|connections|having|not|soffset|vnodes|conns|id|notnull|stable|wal|copy|if|now|stables|where)=`)
+
+func linesNormalize(line string) string {
+	line = strings.ReplaceAll(line, "-", "_")
+	line = reKeys.ReplaceAllString(line, `${1}_${2}=`)
+	return line
+}
 func (p *Influxdb) write(c *gin.Context) {
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
@@ -87,6 +104,7 @@ func (p *Influxdb) write(c *gin.Context) {
 		tmp.Write(l)
 		if !hasNext {
 			lines = append(lines, tmp.String())
+
 			tmp.Reset()
 		}
 	}
@@ -118,7 +136,7 @@ func (p *Influxdb) write(c *gin.Context) {
 	}
 	defer taosConn.Put()
 	conn := taosConn.TaosConnection
-	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns'", db))
+	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", db))
 	if err != nil {
 		logger.WithError(err).Errorln("create database error", db)
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
@@ -131,14 +149,40 @@ func (p *Influxdb) write(c *gin.Context) {
 		return
 	}
 	start := time.Now()
-	logger.Debugln(start, "insert lines", lines)
-	err = conn.InfluxDBInsertLines(lines, precision)
-	logger.Debugln("insert lines finish cast:", time.Now().Sub(start))
-	if err != nil {
-		logger.WithError(err).Errorln("insert lines error", lines)
+	// logger.Debugln(start, "insert lines", lines)
+	succeeded := 0
+	batchSize := 10
+	for i := 0; i < (len(lines)+batchSize-1)/batchSize; i++ {
+		ls := lines[batchSize*i : min(batchSize*(i+1), len(lines))]
+		err = conn.InfluxDBInsertLines(ls, precision)
+		if err != nil {
+			// logger.WithError(err).Errorln("insert lines error", len(ls), ls)
+			e := err.(*errors.TaosError)
+			if e.Code == errors.RPC_ACTION_IN_PROGRESS {
+				for j := 0; j < len(ls); j++ {
+					err = conn.InfluxDBInsertLines(ls[j:j+1], precision)
+					if err != nil {
+						logger.WithError(err).Errorln("insert line error", ls[j])
+						continue
+					}
+					succeeded += 1
+				}
+			}
+			continue
+		}
+		succeeded += len(ls)
+	}
+	if succeeded == 0 {
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
+	logger.Debugln("inserted", succeeded, "/", len(lines), " lines finish cast:", time.Since(start))
+	// err = conn.InfluxDBInsertLines(lines, precision)
+	// if err != nil {
+	// 	logger.WithError(err).Errorln("insert lines error", len(lines), lines)
+	// 	p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
+	// 	return
+	// }
 	c.Status(http.StatusNoContent)
 }
 
