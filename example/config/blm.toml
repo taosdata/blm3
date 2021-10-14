@@ -1,6 +1,11 @@
-debug = true
+debug = false
 port = 6041
-logLevel = "debug"
+logLevel = "info"
+
+[pool]
+maxConnect = 100
+maxIdle = 5
+idleTimeout = "1m"
 
 [ssl]
 enable = false
@@ -11,6 +16,7 @@ keyFile = ""
 path = "/var/log/taos"
 rotationCount = 30
 rotationTime = "24h"
+rotationSize = "1GB"
 
 [opentsdb]
 enable = true
@@ -24,6 +30,7 @@ port = 25826
 db = "collectd"
 user = "root"
 password = "taosdata"
+worker = 10
 
 [statsd]
 enable = true
@@ -32,11 +39,11 @@ db = "statsd"
 user = "root"
 password = "taosdata"
 worker = 10
-gatherInterval = "20s"
+gatherInterval = "5s"
 protocol = "udp"
 maxTCPConnections = 250
 tcpKeepAlive = false
-allowPendingMessages = 10000
+allowPendingMessages = 50000
 deleteCounters = true
 deleteGauges = true
 deleteSets = true

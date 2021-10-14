@@ -2,10 +2,10 @@ package log
 
 import (
 	"fmt"
+	"github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/blm3/tools/pool"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
 	"path"
@@ -50,6 +50,7 @@ func ConfigLog() {
 		path.Join(config.Conf.Log.Path, "blm_%Y_%m_%d_%H_%M.log"),
 		rotatelogs.WithRotationCount(config.Conf.Log.RotationCount),
 		rotatelogs.WithRotationTime(config.Conf.Log.RotationTime),
+		rotatelogs.WithRotationSize(int64(config.Conf.Log.RotationSize)),
 	)
 	if err != nil {
 		panic(err)

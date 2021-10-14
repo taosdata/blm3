@@ -69,8 +69,8 @@ func init() {
 	viper.SetDefault("statsd.worker", 10)
 
 	_ = viper.BindEnv("statsd.gatherInterval", "BLM_STATSD_GATHER_INTERVAL")
-	pflag.Duration("statsd.gatherInterval", time.Second*30, `statsd gather interval. Env "BLM_STATSD_GATHER_INTERVAL"`)
-	viper.SetDefault("statsd.gatherInterval", "30s")
+	pflag.Duration("statsd.gatherInterval", time.Second*5, `statsd gather interval. Env "BLM_STATSD_GATHER_INTERVAL"`)
+	viper.SetDefault("statsd.gatherInterval", "5s")
 
 	_ = viper.BindEnv("statsd.protocol", "BLM_STATSD_PROTOCOL")
 	pflag.String("statsd.protocol", "udp", `statsd protocol [tcp or udp]. Env "BLM_STATSD_PROTOCOL"`)
@@ -85,8 +85,8 @@ func init() {
 	viper.SetDefault("statsd.tcpKeepAlive", false)
 
 	_ = viper.BindEnv("statsd.allowPendingMessages", "BLM_STATSD_ALLOW_PENDING_MESSAGES")
-	pflag.Int("statsd.allowPendingMessages", 10000, `statsd allow pending messages. Env "BLM_STATSD_ALLOW_PENDING_MESSAGES"`)
-	viper.SetDefault("statsd.allowPendingMessages", 10000)
+	pflag.Int("statsd.allowPendingMessages", 50000, `statsd allow pending messages. Env "BLM_STATSD_ALLOW_PENDING_MESSAGES"`)
+	viper.SetDefault("statsd.allowPendingMessages", 50000)
 
 	_ = viper.BindEnv("statsd.deleteCounters", "BLM_STATSD_DELETE_COUNTERS")
 	pflag.Bool("statsd.deleteCounters", true, `statsd delete counter cache after gather. Env "BLM_STATSD_DELETE_COUNTERS"`)

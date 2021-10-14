@@ -1,8 +1,8 @@
-package db
+package advancedpool
 
 import (
-	"github.com/taosdata/blm3/config"
 	"github.com/silenceper/pool"
+	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/driver-go/v2/af"
 	"github.com/taosdata/driver-go/v2/wrapper"
 	"sync"
@@ -122,7 +122,7 @@ func GetAdvanceConnection(user, password string) (*AdvanceConn, error) {
 		if err != nil {
 			return nil, err
 		}
-		connectionMap.Store(user, newPool)
+		advanceConnectionMap.Store(user, newPool)
 		c, err := newPool.Get()
 		if err != nil {
 			return nil, err
