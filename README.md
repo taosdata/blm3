@@ -1,6 +1,7 @@
-# BLM3 
+# BLM3
 
 ## Function
+
 * Compatible with restful interface
 * Compatible with influxdb v1 write interface
 * Compatible with opentsdb json and telnet format writing
@@ -8,42 +9,70 @@
 * Seamless connection with statsd
 
 ## Interface
+
 ### restful
+
 ```
 /rest/sql
 /rest/sqlt
 /rest/sqlutc
 ```
+
 ### influxdb
+
 ```
 /influxdb/v1/write
 ```
+
 Support query parameters
->`db` Specify the necessary parameters for the database
+> `db` Specify the necessary parameters for the database
 > `precision` time precision non-essential parameter
 > `u` user non-essential parameters
 > `p` password Optional parameter
 
 ### opentsdb
+
 ```
 /opentsdb/v1/put/json/:db
 /opentsdb/v1/put/telnet/:db
 ```
+
 ### collectd
+
 Modify the collected configuration `/etc/collectd/collectd.conf`
+
 ```
 LoadPlugin network
 <Plugin network>
          Server "127.0.0.1" "25826"
 </Plugin>
 ```
+
 ### statsd
-Out of the box
+
+statsd modify the configuration file `path_to_statsd/config.js`
+
+* > `backends` add `"./backends/repeater"`
+* > `repeater` add `{ host:'host to blm3', port: 8126 }`
+
+example config
+
+```
+{
+port: 8125
+, backends: ["./backends/repeater"]
+, repeater: [{ host: '127.0.0.1', port: 8126}]
+}
+```
+
+
 
 ## Configuration
+
 Support command line parameters, environment variables and configuration files
 `Command line parameters take precedence over environment variables take precedence over configuration files`
 The command line usage is arg=val such as `blm3 -p=30000 --debug=true`
+
 ```shell
 Usage of ./blm3:
       --collectd.db string                collectd db name. Env "BLM_COLLECTD_DB" (default "collectd")
@@ -82,10 +111,11 @@ Usage of ./blm3:
       --statsd.gatherInterval duration    statsd gather interval. Env "BLM_STATSD_GATHER_INTERVAL" (default 30s)
       --statsd.maxTCPConnections int      statsd max tcp connections. Env "BLM_STATSD_MAX_TCP_CONNECTIONS" (default 250)
       --statsd.password string            statsd password. Env "BLM_STATSD_PASSWORD" (default "taosdata")
-      --statsd.port int                   statsd server port. Env "BLM_STATSD_PORT" (default 8125)
+      --statsd.port int                   statsd server port. Env "BLM_STATSD_PORT" (default 8126)
       --statsd.protocol string            statsd protocol [tcp or udp]. Env "BLM_STATSD_PROTOCOL" (default "udp")
       --statsd.tcpKeepAlive               enable tcp keep alive. Env "BLM_COLLECTD_TCP_KEEP_ALIVE"
       --statsd.user string                statsd user. Env "BLM_STATSD_USER" (default "root")
       --statsd.worker int                 statsd write worker. Env "BLM_STATSD_WORKER" (default 10)
 ```
+
 For the default configuration file, see [example/config/blm.toml](example/config/blm.toml)
