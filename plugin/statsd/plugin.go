@@ -8,7 +8,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/statsd"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/sirupsen/logrus"
-	dbPackage "github.com/taosdata/blm3/db"
+	dbPackage "github.com/taosdata/blm3/db/advancepool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"time"
@@ -124,7 +124,7 @@ func (p *Plugin) HandleMetrics(metrics ...telegraf.Metric) {
 		}
 		defer taosConn.Put()
 		conn := taosConn.TaosConnection
-		_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns'", p.conf.DB))
+		_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", p.conf.DB))
 		if err != nil {
 			logger.WithError(err).Errorln("create database error", p.conf.DB)
 			return

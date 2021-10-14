@@ -3,6 +3,7 @@ package influxdb
 import (
 	"bufio"
 	"fmt"
+	dbPackage "github.com/taosdata/blm3/db/advancepool"
 	"io"
 	"net/http"
 	"regexp"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	dbPackage "github.com/taosdata/blm3/db"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools"

@@ -1,9 +1,9 @@
-package db
+package commonpool
 
 import (
 	"database/sql/driver"
-	"github.com/taosdata/blm3/config"
 	"github.com/silenceper/pool"
+	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/driver-go/v2/af"
 	"github.com/taosdata/driver-go/v2/wrapper"
 	"sync"

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	dbPackage "github.com/taosdata/blm3/db"
+	dbPackage "github.com/taosdata/blm3/db/advancepool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/pool"
