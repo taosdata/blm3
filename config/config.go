@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"os"
 	"time"
 )
+
+const Version = "0.0.1"
 
 type Config struct {
 	Cors     CorsConfig
@@ -111,7 +114,18 @@ func Init() {
 	viper.SetConfigName("blm")
 	viper.AddConfigPath("/etc/taos")
 	cp := pflag.StringP("config", "c", "", "config path default /etc/taos/blm.toml")
+	version := pflag.Bool("version", false, "Print the version and exit")
+	help := pflag.Bool("help", false, "Print this help message and exit")
 	pflag.Parse()
+	if *help {
+		fmt.Fprintf(os.Stderr, "Usage of blm3 v%s:\n", Version)
+		pflag.PrintDefaults()
+		os.Exit(0)
+	}
+	if *version {
+		fmt.Printf("blm3 v%s", Version)
+		os.Exit(0)
+	}
 	if *cp != "" {
 		viper.SetConfigFile(*cp)
 	}
