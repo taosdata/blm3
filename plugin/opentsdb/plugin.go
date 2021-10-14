@@ -82,7 +82,7 @@ func (p *Plugin) insertJson(c *gin.Context) {
 	}
 	defer func() {
 		putErr := taosConn.Put()
-		if err != nil {
+		if putErr != nil {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
@@ -155,7 +155,7 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 	}
 	defer func() {
 		putErr := taosConn.Put()
-		if err != nil {
+		if putErr != nil {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()

@@ -11,6 +11,7 @@ import (
 	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
+	"github.com/taosdata/blm3/tools/influxdb/parse"
 	"time"
 )
 
@@ -109,10 +110,13 @@ func (p *Plugin) Version() string {
 func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Metric) {
 	data, err := serializer.Serialize(metric)
 	if err != nil {
-		logger.WithError(err).Error("serialize collectd error")
+		logger.WithError(err).Error("serialize statsd error")
 		return
 	}
-	lines := []string{string(data[:len(data)-1])}
+	lines, err := parse.Repair(data, "ns")
+	if err != nil {
+		logger.WithError(err).Error("serialize statsd error")
+	}
 	taosConn, err := advancedpool.GetAdvanceConnection(p.conf.User, p.conf.Password)
 	if err != nil {
 		logger.WithError(err).Errorln("connect taosd error")
@@ -120,7 +124,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Me
 	}
 	defer func() {
 		putErr := taosConn.Put()
-		if err != nil {
+		if putErr != nil {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
@@ -138,7 +142,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Me
 	start := time.Now()
 	logger.Debugln(start, "insert line", lines[0])
 	err = conn.InfluxDBInsertLines(lines, "ns")
-	logger.Debugln("insert line finish cast:", time.Now().Sub(start))
+	logger.Debugln("insert line finish cast:", time.Now().Sub(start), lines)
 	if err != nil {
 		logger.WithError(err).Errorln("insert line error", lines)
 		return

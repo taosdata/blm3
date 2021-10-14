@@ -1,12 +1,10 @@
 package influxdb
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/taosdata/blm3/db/advancedpool"
-	"io"
+	"github.com/taosdata/blm3/tools/influxdb/parse"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -66,48 +64,16 @@ func min(l int, r int) int {
 	return r
 }
 
-var reKeys = regexp.MustCompile(`([ ,])(abort|create|ignore|null|star|account|ctime|immediate|of|state|accounts|database|import|offset|statement|add|databases|in|or|state_window|after|days|initially|order|storage|all|dbs|insert|partitions|stream|alter|deferred|instead|pass|streams|and|delimiters|int|plus|string|as|desc|integer|pps|syncdb|asc|describe|interval|precision|table|attach|detach|into|prev|tables|before|distinct|is|privilege|tag|begin|divide|isnull|qtime|tags|between|dnode|join|queries|tbname|bigint|dnodes|keep|query|times|binary|dot|key|quorum|timestamp|bitand|double|kill|raise|tinyint|bitnot|drop|le|rem|topic|bitor|each|like|replace|topics|blocks|end|limit|replica|trigger|bool|eq|linear|reset|tseries|by|exists|local|restrict|uminus|cache|explain|lp|row|union|cachelast|fail|lshift|rp|unsigned|cascade|file|lt|rshift|update|change|fill|match|scores|uplus|cluster|float|maxrows|select|use|colon|for|minrows|semi|user|column|from|minus|session|users|comma|fsync|mnodes|set|using|comp|ge|modify|show|values|compact|glob|modules|slash|variable|concat|grants|nchar|sliding|variables|conflict|group|ne|slimit|vgroups|connection|gt|none|smallint|view|connections|having|not|soffset|vnodes|conns|id|notnull|stable|wal|copy|if|now|stables|where)=`)
-
-func linesNormalize(line string) string {
-	line = strings.ReplaceAll(line, "-", "_")
-	line = reKeys.ReplaceAllString(line, `${1}_${2}=`)
-	return line
-}
 func (p *Influxdb) write(c *gin.Context) {
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
 	var lines []string
-	rd := bufio.NewReader(c.Request.Body)
 	precision := c.Query("precision")
 	if len(precision) == 0 {
 		precision = "ns"
 	}
 	tmp := pool.BytesPoolGet()
 	defer pool.BytesPoolPut(tmp)
-	for {
-		l, hasNext, err := rd.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				break
-			} else {
-				logger.Errorln("read line error", err)
-				p.badRequestResponse(c, &badRequest{
-					Code:    "internal error",
-					Message: "read line error",
-					Op:      "read line",
-					Err:     err.Error(),
-					Line:    len(lines),
-				})
-				return
-			}
-		}
-		tmp.Write(l)
-		if !hasNext {
-			lines = append(lines, tmp.String())
-
-			tmp.Reset()
-		}
-	}
 	user, password, err := plugin.GetAuth(c)
 	if err != nil {
 		p.commonResponse(c, http.StatusUnauthorized, &message{
@@ -128,6 +94,31 @@ func (p *Influxdb) write(c *gin.Context) {
 		})
 		return
 	}
+	data, err := c.GetRawData()
+	if err != nil {
+		logger.WithError(err).Errorln("read line error")
+		p.badRequestResponse(c, &badRequest{
+			Code:    "internal error",
+			Message: "read line error",
+			Op:      "read line",
+			Err:     err.Error(),
+			Line:    0,
+		})
+		return
+	}
+	var wrongIndex int
+	lines, wrongIndex, err = parse.Repair(data, precision)
+	if err != nil {
+		logger.WithError(err).Errorln("parse line error")
+		p.badRequestResponse(c, &badRequest{
+			Code:    "internal error",
+			Message: "read line error",
+			Op:      "read line",
+			Err:     err.Error(),
+			Line:    wrongIndex,
+		})
+		return
+	}
 	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Errorln("connect taosd error")
@@ -136,7 +127,7 @@ func (p *Influxdb) write(c *gin.Context) {
 	}
 	defer func() {
 		putErr := taosConn.Put()
-		if err != nil {
+		if putErr != nil {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
@@ -182,12 +173,6 @@ func (p *Influxdb) write(c *gin.Context) {
 		return
 	}
 	logger.Debugln("inserted", succeeded, "/", len(lines), " lines finish cast:", time.Since(start))
-	// err = conn.InfluxDBInsertLines(lines, precision)
-	// if err != nil {
-	// 	logger.WithError(err).Errorln("insert lines error", len(lines), lines)
-	// 	p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
-	// 	return
-	// }
 	c.Status(http.StatusNoContent)
 }
 
@@ -198,6 +183,7 @@ type badRequest struct {
 	Err     string `json:"err"`
 	Line    int    `json:"line"`
 }
+
 type message struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`

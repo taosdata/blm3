@@ -50,6 +50,7 @@ func ConfigLog() {
 		path.Join(config.Conf.Log.Path, "blm_%Y_%m_%d_%H_%M.log"),
 		rotatelogs.WithRotationCount(config.Conf.Log.RotationCount),
 		rotatelogs.WithRotationTime(config.Conf.Log.RotationTime),
+		rotatelogs.WithRotationSize(int64(config.Conf.Log.RotationSize)),
 	)
 	if err != nil {
 		panic(err)

@@ -10,6 +10,7 @@ import (
 	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
+	"github.com/taosdata/blm3/tools/influxdb/parse"
 	"net"
 	"strings"
 	"time"
@@ -36,7 +37,6 @@ func (p *Plugin) Init(_ gin.IRouter) error {
 	p.conf.DB = viper.GetString("collectd.db")
 	p.conf.User = viper.GetString("collectd.user")
 	p.conf.Password = viper.GetString("collectd.password")
-	p.serializer = influx.NewSerializer()
 	p.parser = &collectd.CollectdParser{
 		ParseMultiValue: "split",
 	}
@@ -104,7 +104,12 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf
 			logger.WithError(err).Error("serialize collectd error")
 			continue
 		}
-		lines = append(lines, string(data[:len(data)-1]))
+		l, wrongIndex, err := parse.Repair(data, "ns")
+		if err != nil {
+			logger.WithError(err).Error("serialize collectd error", l, wrongIndex)
+			continue
+		}
+		lines = append(lines, l...)
 	}
 	taosConn, err := advancedpool.GetAdvanceConnection(p.conf.User, p.conf.Password)
 	if err != nil {
@@ -113,7 +118,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf
 	}
 	defer func() {
 		putErr := taosConn.Put()
-		if err != nil {
+		if putErr != nil {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
@@ -129,10 +134,9 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf
 		return
 	}
 	start := time.Now()
-	l := make([]string, len(lines))
-	logger.Debugln(start, "insert lines", l[0])
+	logger.Debugln(start, "insert lines", lines)
 	err = conn.InfluxDBInsertLines(lines, "ns")
-	logger.Debugln("insert lines finish cast:", time.Now().Sub(start))
+	logger.Debugln("insert lines finish cast:", time.Now().Sub(start), lines)
 	if err != nil {
 		logger.WithError(err).Errorln("insert lines error", lines)
 		return

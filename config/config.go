@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"runtime"
 	"time"
 )
 
@@ -51,9 +50,9 @@ type Pool struct {
 }
 
 func initPool() {
-	viper.SetDefault("pool.maxConnect", runtime.NumCPU()*2+5)
+	viper.SetDefault("pool.maxConnect", 100)
 	_ = viper.BindEnv("pool.maxConnect", "BLM_POOL_MAX_CONNECT")
-	pflag.Int("pool.maxConnect", runtime.NumCPU()*2+5, `max connections to taosd. Env "BLM_POOL_MAX_CONNECT"`)
+	pflag.Int("pool.maxConnect", 100, `max connections to taosd. Env "BLM_POOL_MAX_CONNECT"`)
 
 	viper.SetDefault("pool.maxIdle", 5)
 	_ = viper.BindEnv("pool.maxIdle", "BLM_POOL_MAX_IDLE")
@@ -75,6 +74,7 @@ type Log struct {
 	Path          string
 	RotationCount uint
 	RotationTime  time.Duration
+	RotationSize  uint
 }
 
 func initLog() {
@@ -89,12 +89,17 @@ func initLog() {
 	viper.SetDefault("log.rotationTime", time.Hour*24)
 	_ = viper.BindEnv("log.rotationTime", "BLM_LOG_ROTATION_TIME")
 	pflag.Duration("log.rotationTime", time.Hour*24, `log rotation time. Env "BLM_LOG_ROTATION_TIME"`)
+
+	viper.SetDefault("log.rotationSize", "1GB")
+	_ = viper.BindEnv("log.rotationSize", "BLM_LOG_ROTATION_SIZE")
+	pflag.String("log.rotationSize", "1GB", `log rotation size(KB MB GB), must be a positive integer. Env "BLM_LOG_ROTATION_SIZE"`)
 }
 
 func (l *Log) setValue() {
 	l.Path = viper.GetString("log.path")
 	l.RotationCount = viper.GetUint("log.rotationCount")
 	l.RotationTime = viper.GetDuration("log.rotationTime")
+	l.RotationSize = viper.GetSizeInBytes("log.rotationSize")
 }
 
 var (
@@ -142,7 +147,7 @@ func init() {
 
 	viper.SetDefault("port", 6041)
 	_ = viper.BindEnv("port", "BLM_PORT")
-	pflag.IntP("port", "p", 6041, `http port. Env "BLM_PORT"`)
+	pflag.IntP("port", "P", 6041, `http port. Env "BLM_PORT"`)
 
 	viper.SetDefault("logLevel", "info")
 	_ = viper.BindEnv("logLevel", "BLM_LOG_LEVEL")

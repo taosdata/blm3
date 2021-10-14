@@ -7,6 +7,7 @@ require (
 	github.com/gin-contrib/gzip v0.0.3
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.7.2
+	github.com/influxdata/influxdb/v2 v2.0.9
 	github.com/influxdata/telegraf v1.20.2
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
