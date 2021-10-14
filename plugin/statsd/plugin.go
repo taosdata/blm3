@@ -113,7 +113,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Me
 		logger.WithError(err).Error("serialize statsd error")
 		return
 	}
-	lines, err := parse.Repair(data, "ns")
+	lines, _, err := parse.Repair(data, "ns")
 	if err != nil {
 		logger.WithError(err).Error("serialize statsd error")
 	}
