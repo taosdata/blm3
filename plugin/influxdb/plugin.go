@@ -103,7 +103,7 @@ func (p *Influxdb) write(c *gin.Context) {
 		}
 		tmp.Write(l)
 		if !hasNext {
-			lines = append(lines, tmp.String())
+			lines = append(lines, linesNormalize(tmp.String()))
 
 			tmp.Reset()
 		}
