@@ -1,10 +1,11 @@
 package parse
 
 import (
-	"github.com/taosdata/blm3/common"
-	"github.com/taosdata/blm3/tools/pool"
 	"strings"
 	"time"
+
+	"github.com/taosdata/blm3/common"
+	"github.com/taosdata/blm3/tools/pool"
 )
 
 func Repair(buf []byte, precision string) ([]string, int, error) {
@@ -51,7 +52,7 @@ func Repair(buf []byte, precision string) ([]string, int, error) {
 func repairName(s []byte) string {
 	result := pool.BytesPoolGet()
 	defer pool.BytesPoolPut(result)
-	if (s[0] <= 'z' && s[0] >= 'a') || s[0] == '_' {
+	if (s[0] <= 'z' && s[0] >= 'a') || (s[0] <= 'Z' && s[0] >= 'A') || s[0] == '_' {
 
 	} else {
 		result.WriteByte('_')
@@ -76,7 +77,7 @@ func repairName(s []byte) string {
 }
 
 func checkByte(b byte) bool {
-	if (b <= 'z' && b >= 'a') || b == '_' || (b <= '9' && b >= '0') {
+	if (b <= 'z' && b >= 'a') || (b <= 'Z' && b >= 'A') || b == '_' || (b <= '9' && b >= '0') {
 		return true
 	}
 	return false
