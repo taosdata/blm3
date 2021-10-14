@@ -7,7 +7,7 @@ import (
 	"github.com/influxdata/telegraf/plugins/parsers/collectd"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/spf13/viper"
-	dbPackage "github.com/taosdata/blm3/db/advancepool"
+	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"net"
@@ -22,9 +22,11 @@ type Plugin struct {
 	conn       net.PacketConn
 	serializer *influx.Serializer
 	parser     *collectd.CollectdParser
+	metricChan chan []telegraf.Metric
+	closeChan  chan struct{}
 }
 
-func (p *Plugin) Init(r gin.IRouter) error {
+func (p *Plugin) Init(_ gin.IRouter) error {
 	p.conf.setValue()
 	if !p.conf.Enable {
 		logger.Info("collectd disabled")
@@ -52,15 +54,34 @@ func (p *Plugin) Start() error {
 	if err != nil {
 		return err
 	}
+	p.closeChan = make(chan struct{})
+	p.metricChan = make(chan []telegraf.Metric, 2*p.conf.Worker)
+	for i := 0; i < p.conf.Worker; i++ {
+		go func() {
+			serializer := influx.NewSerializer()
+			for {
+				select {
+				case metric := <-p.metricChan:
+					p.HandleMetrics(serializer, metric)
+				case <-p.closeChan:
+					return
+				}
+			}
+		}()
+	}
 	p.conn = conn
 	go p.listen()
 	return nil
 }
 
 func (p *Plugin) Stop() error {
+	if !p.conf.Enable {
+		return nil
+	}
 	if p.conn != nil {
 		return p.conn.Close()
 	}
+	close(p.closeChan)
 	return nil
 }
 
@@ -72,40 +93,49 @@ func (p *Plugin) Version() string {
 	return "v1"
 }
 
-func (p *Plugin) writeMetric(metrics []telegraf.Metric) {
+func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf.Metric) {
+	if len(metrics) == 0 {
+		return
+	}
 	lines := make([]string, 0, len(metrics))
 	for _, metric := range metrics {
-		data, err := p.serializer.Serialize(metric)
+		data, err := serializer.Serialize(metric)
 		if err != nil {
 			logger.WithError(err).Error("serialize collectd error")
 			continue
 		}
 		lines = append(lines, string(data[:len(data)-1]))
-		taosConn, err := dbPackage.GetAdvanceConnection(p.conf.User, p.conf.Password)
+	}
+	taosConn, err := advancedpool.GetAdvanceConnection(p.conf.User, p.conf.Password)
+	if err != nil {
+		logger.WithError(err).Errorln("connect taosd error")
+		return
+	}
+	defer func() {
+		putErr := taosConn.Put()
 		if err != nil {
-			logger.WithError(err).Errorln("connect taosd error")
-			return
+			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
-		defer taosConn.Put()
-		conn := taosConn.TaosConnection
-		_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", p.conf.DB))
-		if err != nil {
-			logger.WithError(err).Errorln("create database error", p.conf.DB)
-			return
-		}
-		_, err = conn.Exec(fmt.Sprintf("use %s", p.conf.DB))
-		if err != nil {
-			logger.WithError(err).Error("change to database error", p.conf.DB)
-			return
-		}
-		start := time.Now()
-		logger.Debugln(start, "insert lines", lines)
-		err = conn.InfluxDBInsertLines(lines, "ns")
-		logger.Debugln("insert lines finish cast:", time.Now().Sub(start))
-		if err != nil {
-			logger.WithError(err).Errorln("insert lines error", lines)
-			return
-		}
+	}()
+	conn := taosConn.TaosConnection
+	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", p.conf.DB))
+	if err != nil {
+		logger.WithError(err).Errorln("create database error", p.conf.DB)
+		return
+	}
+	_, err = conn.Exec(fmt.Sprintf("use %s", p.conf.DB))
+	if err != nil {
+		logger.WithError(err).Error("change to database error", p.conf.DB)
+		return
+	}
+	start := time.Now()
+	l := make([]string, len(lines))
+	logger.Debugln(start, "insert lines", l[0])
+	err = conn.InfluxDBInsertLines(lines, "ns")
+	logger.Debugln("insert lines finish cast:", time.Now().Sub(start))
+	if err != nil {
+		logger.WithError(err).Errorln("insert lines error", lines)
+		return
 	}
 }
 
@@ -125,7 +155,8 @@ func (p *Plugin) listen() {
 			logger.Errorf("Unable to parse incoming packet: %s", err.Error())
 			continue
 		}
-		p.writeMetric(metrics)
+		p.metricChan <- metrics
+
 	}
 }
 

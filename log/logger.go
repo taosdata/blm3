@@ -2,10 +2,10 @@ package log
 
 import (
 	"fmt"
+	"github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
 	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/blm3/tools/pool"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
 	"path"

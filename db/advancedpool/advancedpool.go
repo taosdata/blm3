@@ -1,4 +1,4 @@
-package advancepool
+package advancedpool
 
 import (
 	"github.com/silenceper/pool"

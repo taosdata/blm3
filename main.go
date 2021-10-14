@@ -36,6 +36,9 @@ func createRouter(debug bool, corsConf *config.CorsConfig, enableGzip bool) *gin
 	if debug {
 		pprof.Register(router)
 	}
+	router.GET("-/ping", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
 	if enableGzip {
 		router.Use(gzip.Gzip(gzip.DefaultCompression))
 	}

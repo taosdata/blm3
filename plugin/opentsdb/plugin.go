@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	dbPackage "github.com/taosdata/blm3/db/advancepool"
+	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/pool"
@@ -74,13 +74,18 @@ func (p *Plugin) insertJson(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
+	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer taosConn.Put()
+	defer func() {
+		putErr := taosConn.Put()
+		if err != nil {
+			logger.WithError(putErr).Errorln("taos connect pool put error")
+		}
+	}()
 	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {
@@ -142,13 +147,18 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
+	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
 		return
 	}
-	defer taosConn.Put()
+	defer func() {
+		putErr := taosConn.Put()
+		if err != nil {
+			logger.WithError(putErr).Errorln("taos connect pool put error")
+		}
+	}()
 	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
 	if err != nil {

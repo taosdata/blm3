@@ -74,12 +74,13 @@ Support command line parameters, environment variables and configuration files
 The command line usage is arg=val such as `blm3 -p=30000 --debug=true`
 
 ```shell
-Usage of ./blm3:
+Usage of blm3:
       --collectd.db string                collectd db name. Env "BLM_COLLECTD_DB" (default "collectd")
       --collectd.enable                   enable collectd. Env "BLM_COLLECTD_ENABLE" (default true)
       --collectd.password string          collectd password. Env "BLM_COLLECTD_PASSWORD" (default "taosdata")
       --collectd.port int                 collectd server port. Env "BLM_COLLECTD_PORT" (default 25826)
       --collectd.user string              collectd user. Env "BLM_COLLECTD_USER" (default "root")
+      --collectd.worker int               collectd write worker. Env "BLM_COLLECTD_WORKER" (default 10)
   -c, --config string                     config path default /etc/taos/blm.toml
       --cors.allowAllOrigins              cors allow all origins. Env "BLM_CORS_ALLOW_ALL_ORIGINS"
       --cors.allowCredentials             cors allow credentials. Env "BLM_CORS_ALLOW_Credentials"

@@ -3,7 +3,7 @@ package influxdb
 import (
 	"bufio"
 	"fmt"
-	dbPackage "github.com/taosdata/blm3/db/advancepool"
+	"github.com/taosdata/blm3/db/advancedpool"
 	"io"
 	"net/http"
 	"regexp"
@@ -128,13 +128,18 @@ func (p *Influxdb) write(c *gin.Context) {
 		})
 		return
 	}
-	taosConn, err := dbPackage.GetAdvanceConnection(user, password)
+	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Errorln("connect taosd error")
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
-	defer taosConn.Put()
+	defer func() {
+		putErr := taosConn.Put()
+		if err != nil {
+			logger.WithError(putErr).Errorln("taos connect pool put error")
+		}
+	}()
 	conn := taosConn.TaosConnection
 	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", db))
 	if err != nil {

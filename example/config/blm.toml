@@ -24,6 +24,7 @@ port = 25826
 db = "collectd"
 user = "root"
 password = "taosdata"
+worker = 10
 
 [statsd]
 enable = true

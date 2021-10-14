@@ -12,6 +12,7 @@ type Config struct {
 	DB       string
 	User     string
 	Password string
+	Worker   int
 }
 
 func (c *Config) setValue() {
@@ -20,6 +21,7 @@ func (c *Config) setValue() {
 	c.DB = viper.GetString("collectd.db")
 	c.User = viper.GetString("collectd.user")
 	c.Password = viper.GetString("collectd.password")
+	c.Worker = viper.GetInt("collectd.worker")
 }
 
 func init() {
@@ -43,4 +45,7 @@ func init() {
 	pflag.String("collectd.password", common.DefaultPassword, `collectd password. Env "BLM_COLLECTD_PASSWORD"`)
 	viper.SetDefault("collectd.password", common.DefaultPassword)
 
+	_ = viper.BindEnv("collectd.worker", "BLM_COLLECTD_WORKER")
+	pflag.Int("collectd.worker", 10, `collectd write worker. Env "BLM_COLLECTD_WORKER"`)
+	viper.SetDefault("collectd.worker", 10)
 }
