@@ -2,11 +2,12 @@ package influxdb
 
 import (
 	"fmt"
-	"github.com/taosdata/blm3/db/advancedpool"
-	"github.com/taosdata/blm3/tools/influxdb/parse"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/taosdata/blm3/db/advancedpool"
+	"github.com/taosdata/blm3/tools/influxdb/parse"
 
 	"github.com/gin-gonic/gin"
 	"github.com/taosdata/blm3/log"
@@ -15,7 +16,6 @@ import (
 	"github.com/taosdata/blm3/tools/pool"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/af"
-	"github.com/taosdata/driver-go/v2/errors"
 )
 
 var logger = log.GetLogger("influxdb")
@@ -152,17 +152,13 @@ func (p *Influxdb) write(c *gin.Context) {
 		ls := lines[batchSize*i : min(batchSize*(i+1), len(lines))]
 		err = conn.InfluxDBInsertLines(ls, precision)
 		if err != nil {
-			// logger.WithError(err).Errorln("insert lines error", len(ls), ls)
-			e := err.(*errors.TaosError)
-			if e.Code == errors.RPC_ACTION_IN_PROGRESS {
-				for j := 0; j < len(ls); j++ {
-					err = conn.InfluxDBInsertLines(ls[j:j+1], precision)
-					if err != nil {
-						logger.WithError(err).Errorln("insert line error", ls[j])
-						continue
-					}
-					succeeded += 1
+			for j := 0; j < len(ls); j++ {
+				err = conn.InfluxDBInsertLines(ls[j:j+1], precision)
+				if err != nil {
+					logger.WithError(err).Errorln("insert line error", ls[j])
+					continue
 				}
+				succeeded += 1
 			}
 			continue
 		}
