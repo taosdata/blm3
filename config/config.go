@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/taosdata/blm3/version"
+	"os"
 	"time"
 )
 
@@ -111,7 +113,18 @@ func Init() {
 	viper.SetConfigName("blm")
 	viper.AddConfigPath("/etc/taos")
 	cp := pflag.StringP("config", "c", "", "config path default /etc/taos/blm.toml")
+	v := pflag.Bool("version", false, "Print the version and exit")
+	help := pflag.Bool("help", false, "Print this help message and exit")
 	pflag.Parse()
+	if *help {
+		fmt.Fprintf(os.Stderr, "Usage of blm3 v%s-%s:\n", version.Version, version.CommitID)
+		pflag.PrintDefaults()
+		os.Exit(0)
+	}
+	if *v {
+		fmt.Printf("blm3 v%s-%s", version.Version, version.CommitID)
+		os.Exit(0)
+	}
 	if *cp != "" {
 		viper.SetConfigFile(*cp)
 	}
