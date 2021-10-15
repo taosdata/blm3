@@ -168,7 +168,7 @@ func (p *Influxdb) write(c *gin.Context) {
 		p.commonResponse(c, http.StatusInternalServerError, &message{Code: "internal error", Message: err.Error()})
 		return
 	}
-	logger.Debugln("inserted", succeeded, "/", len(lines), " lines finish cast:", time.Since(start))
+	logger.Debugln("inserted", succeeded, "/", len(lines), " lines finish cost:", time.Since(start))
 	c.Status(http.StatusNoContent)
 }
 
