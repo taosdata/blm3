@@ -3,6 +3,11 @@ package rest
 import (
 	"database/sql/driver"
 	"errors"
+	"net/http"
+	"strings"
+	"time"
+	"unsafe"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	dbPackage "github.com/taosdata/blm3/db/commonpool"
@@ -12,10 +17,6 @@ import (
 	"github.com/taosdata/driver-go/v2/common"
 	tErrors "github.com/taosdata/driver-go/v2/errors"
 	"github.com/taosdata/driver-go/v2/wrapper"
-	"net/http"
-	"strings"
-	"time"
-	"unsafe"
 )
 
 const LayoutMillSecond = "2006-01-02 15:04:05.000"
@@ -136,7 +137,7 @@ func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	startExec := time.Now()
 	logger.Debugln(startExec, "start execute sql:", sql)
 	result = wrapper.TaosQuery(taosConnect.TaosConnection, sql)
-	logger.Debugln("execute sql cast:", time.Now().Sub(startExec))
+	logger.Debugln("execute sql cost:", time.Now().Sub(startExec))
 	if isDebug {
 		s = time.Now()
 	}

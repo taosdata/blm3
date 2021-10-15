@@ -136,7 +136,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf
 	start := time.Now()
 	logger.Debugln(start, "insert lines", lines)
 	err = conn.InfluxDBInsertLines(lines, "ns")
-	logger.Debugln("insert lines finish cast:", time.Now().Sub(start), lines)
+	logger.Debugln("insert lines finish cost:", time.Now().Sub(start), lines)
 	if err != nil {
 		logger.WithError(err).Errorln("insert lines error", lines)
 		return

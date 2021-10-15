@@ -102,7 +102,7 @@ func (p *Plugin) insertJson(c *gin.Context) {
 	start := time.Now()
 	logger.Debug(start, "insert json payload", string(data))
 	err = conn.OpenTSDBInsertJsonPayload(string(data))
-	logger.Debug("insert json payload cast:", time.Now().Sub(start))
+	logger.Debug("insert json payload cost:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Error("insert json payload error", string(data))
 		p.errorResponse(c, http.StatusInternalServerError, err)
@@ -175,7 +175,7 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 	start := time.Now()
 	logger.Debug(start, "insert telnet payload", lines)
 	err = conn.OpenTSDBInsertTelnetLines(lines)
-	logger.Debug("insert telnet payload cast:", time.Now().Sub(start))
+	logger.Debug("insert telnet payload cost:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Error("insert telnet payload error", lines)
 		p.errorResponse(c, http.StatusInternalServerError, err)
