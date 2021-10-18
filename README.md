@@ -44,7 +44,7 @@ Modify the collected configuration `/etc/collectd/collectd.conf`
 ```
 LoadPlugin network
 <Plugin network>
-         Server "127.0.0.1" "25826"
+         Server "127.0.0.1" "6043"
 </Plugin>
 ```
 
@@ -53,15 +53,15 @@ LoadPlugin network
 statsd modify the configuration file `path_to_statsd/config.js`
 
 * > `backends` add `"./backends/repeater"`
-* > `repeater` add `{ host:'host to blm3', port: 8126 }`
+* > `repeater` add `{ host:'host to blm3', port: 6044}`
 
 example config
 
 ```
 {
-port: 8125
+port: 6044 
 , backends: ["./backends/repeater"]
-, repeater: [{ host: '127.0.0.1', port: 8126}]
+, repeater: [{ host: '127.0.0.1', port: 6044}]
 }
 ```
 
@@ -78,7 +78,7 @@ Usage of blm3:
       --collectd.db string                collectd db name. Env "BLM_COLLECTD_DB" (default "collectd")
       --collectd.enable                   enable collectd. Env "BLM_COLLECTD_ENABLE" (default true)
       --collectd.password string          collectd password. Env "BLM_COLLECTD_PASSWORD" (default "taosdata")
-      --collectd.port int                 collectd server port. Env "BLM_COLLECTD_PORT" (default 25826)
+      --collectd.port int                 collectd server port. Env "BLM_COLLECTD_PORT" (default 6043)
       --collectd.user string              collectd user. Env "BLM_COLLECTD_USER" (default "root")
       --collectd.worker int               collectd write worker. Env "BLM_COLLECTD_WORKER" (default 10)
   -c, --config string                     config path default /etc/taos/blm.toml
@@ -113,7 +113,7 @@ Usage of blm3:
       --statsd.gatherInterval duration    statsd gather interval. Env "BLM_STATSD_GATHER_INTERVAL" (default 5s)
       --statsd.maxTCPConnections int      statsd max tcp connections. Env "BLM_STATSD_MAX_TCP_CONNECTIONS" (default 250)
       --statsd.password string            statsd password. Env "BLM_STATSD_PASSWORD" (default "taosdata")
-      --statsd.port int                   statsd server port. Env "BLM_STATSD_PORT" (default 8126)
+      --statsd.port int                   statsd server port. Env "BLM_STATSD_PORT" (default 6044)
       --statsd.protocol string            statsd protocol [tcp or udp]. Env "BLM_STATSD_PROTOCOL" (default "udp")
       --statsd.tcpKeepAlive               enable tcp keep alive. Env "BLM_COLLECTD_TCP_KEEP_ALIVE"
       --statsd.user string                statsd user. Env "BLM_STATSD_USER" (default "root")

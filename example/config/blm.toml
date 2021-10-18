@@ -34,7 +34,7 @@ worker = 10
 
 [statsd]
 enable = true
-port = 6044 
+port = 6044
 db = "statsd"
 user = "root"
 password = "taosdata"

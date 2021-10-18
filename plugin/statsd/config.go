@@ -49,8 +49,8 @@ func init() {
 	viper.SetDefault("statsd.enable", true)
 
 	_ = viper.BindEnv("statsd.port", "BLM_STATSD_PORT")
-	pflag.Int("statsd.port", 8126, `statsd server port. Env "BLM_STATSD_PORT"`)
-	viper.SetDefault("statsd.port", 8126)
+	pflag.Int("statsd.port", 6044, `statsd server port. Env "BLM_STATSD_PORT"`)
+	viper.SetDefault("statsd.port", 6044)
 
 	_ = viper.BindEnv("statsd.db", "BLM_STATSD_DB")
 	pflag.String("statsd.db", "statsd", `statsd db name. Env "BLM_STATSD_DB"`)
