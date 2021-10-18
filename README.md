@@ -59,7 +59,7 @@ example config
 
 ```
 {
-port: 6044 
+port: 8125
 , backends: ["./backends/repeater"]
 , repeater: [{ host: '127.0.0.1', port: 6044}]
 }
