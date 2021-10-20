@@ -2,11 +2,19 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/db"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	_ "github.com/taosdata/blm3/plugin/collectd"
@@ -14,12 +22,6 @@ import (
 	_ "github.com/taosdata/blm3/plugin/opentsdb"
 	_ "github.com/taosdata/blm3/plugin/statsd"
 	"github.com/taosdata/blm3/rest"
-	"net/http"
-	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
-	"time"
 )
 
 var logger = log.GetLogger("main")
@@ -49,6 +51,7 @@ func createRouter(debug bool, corsConf *config.CorsConfig, enableGzip bool) *gin
 func main() {
 	config.Init()
 	log.ConfigLog()
+	db.PrepareConnection()
 	logger.Info("start server:", log.ServerID)
 	router := createRouter(config.Conf.Debug, &config.Conf.Cors, false)
 	r := rest.Restful{}

@@ -2,6 +2,10 @@ package collectd
 
 import (
 	"fmt"
+	"net"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/parsers/collectd"
@@ -11,9 +15,6 @@ import (
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/influxdb/parse"
-	"net"
-	"strings"
-	"time"
 )
 
 var logger = log.GetLogger("collectd")

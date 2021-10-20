@@ -2,6 +2,8 @@ package statsd
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/agent"
@@ -12,7 +14,6 @@ import (
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/influxdb/parse"
-	"time"
 )
 
 var logger = log.GetLogger("statsd")

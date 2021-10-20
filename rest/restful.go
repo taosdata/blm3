@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	dbPackage "github.com/taosdata/blm3/db/commonpool"
+	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/httperror"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/tools/web"
@@ -31,53 +31,53 @@ type Restful struct {
 
 func (ctl *Restful) Init(r gin.IRouter) error {
 	api := r.Group("rest")
-	api.POST(":name", checkAuth, ctl.sql)
+	api.POST("sql", checkAuth, ctl.sql)
+	api.POST("sqlt", checkAuth, ctl.sqlt)
+	api.POST("sqlutc", checkAuth, ctl.sqlutc)
+	api.POST("sql/:db", checkAuth, ctl.sql)
+	api.POST("sqlt/:db", checkAuth, ctl.sqlt)
+	api.POST("sqlutc/:db", checkAuth, ctl.sqlutc)
 	api.GET("login/:user/:password", ctl.des)
 	return nil
 }
 
 func (ctl *Restful) sql(c *gin.Context) {
-	n := c.Param("name")
-	if len(n) == 0 {
-		errorResponse(c, httperror.HTTP_UNSUPPORT_URL)
-		return
-	}
-	switch n {
-	case "sql":
-		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
-			switch precision {
-			case common.PrecisionMilliSecond:
-				return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutMillSecond)
-			case common.PrecisionMicroSecond:
-				return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutMicroSecond)
-			case common.PrecisionNanoSecond:
-				return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutNanoSecond)
-			}
-			panic("unsupported precision")
-		})
-	case "sqlt":
-		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
-			return ts
-		})
-	case "sqlutc":
-		ctl.doQuery(c, func(ts int64, precision int) driver.Value {
-			return common.TimestampConvertToTime(ts, precision).Format(time.RFC3339Nano)
-		})
-	default:
-		errorResponse(c, httperror.HTTP_UNSUPPORT_URL)
-		return
-	}
+	db := c.Param("db")
+	ctl.doQuery(c, db, func(ts int64, precision int) driver.Value {
+		switch precision {
+		case common.PrecisionMilliSecond:
+			return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutMillSecond)
+		case common.PrecisionMicroSecond:
+			return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutMicroSecond)
+		case common.PrecisionNanoSecond:
+			return common.TimestampConvertToTime(ts, precision).Local().Format(LayoutNanoSecond)
+		}
+		panic("unsupported precision")
+	})
+}
+func (ctl *Restful) sqlt(c *gin.Context) {
+	db := c.Param("db")
+	ctl.doQuery(c, db, func(ts int64, precision int) driver.Value {
+		return ts
+	})
+
+}
+func (ctl *Restful) sqlutc(c *gin.Context) {
+	db := c.Param("db")
+	ctl.doQuery(c, db, func(ts int64, precision int) driver.Value {
+		return common.TimestampConvertToTime(ts, precision).Format(time.RFC3339Nano)
+	})
 }
 
 type TDEngineRestfulResp struct {
 	Status     string           `json:"status"`
 	Head       []string         `json:"head"`
-	Data       [][]driver.Value `json:"data"`
 	ColumnMeta [][]interface{}  `json:"column_meta"`
+	Data       [][]driver.Value `json:"data"`
 	Rows       int              `json:"rows"`
 }
 
-func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
+func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTimeFunc) {
 	var result unsafe.Pointer
 	var s time.Time
 	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
@@ -110,7 +110,7 @@ func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 	if isDebug {
 		s = time.Now()
 	}
-	taosConnect, err := dbPackage.GetConnection(user, password)
+	taosConnect, err := commonpool.GetConnection(user, password)
 
 	logger.Debugln("taos connect cost:", time.Now().Sub(s))
 	if err != nil {
@@ -134,6 +134,23 @@ func (ctl *Restful) doQuery(c *gin.Context, timeFunc wrapper.FormatTimeFunc) {
 		}
 		logger.Debugln("taos put connect cost:", time.Now().Sub(s))
 	}()
+	if len(db) > 0 {
+		if isDebug {
+			s = time.Now()
+		}
+		code := wrapper.TaosSelectDB(taosConnect.TaosConnection, db)
+		logger.Debugln("taos select db cost:", time.Now().Sub(s))
+		if code != httperror.SUCCESS {
+			if isDebug {
+				s = time.Now()
+			}
+			errorMsg := wrapper.TaosErrorStr(result)
+			logger.Debugln("taos select db get error string cost:", time.Now().Sub(s))
+			logger.Errorln("taos select db error:", sql, code&0xffff, errorMsg)
+			errorResponseWithMsg(c, code, errorMsg)
+			return
+		}
+	}
 	startExec := time.Now()
 	logger.Debugln(startExec, "start execute sql:", sql)
 	result = wrapper.TaosQuery(taosConnect.TaosConnection, sql)
@@ -209,6 +226,12 @@ func (ctl *Restful) des(c *gin.Context) {
 		errorResponse(c, httperror.HTTP_GEN_TAOSD_TOKEN_ERR)
 		return
 	}
+	//conn, err := commonpool.GetConnection(user, password)
+	//if err != nil {
+	//	errorResponse(c, httperror.TSDB_CODE_RPC_AUTH_FAILURE)
+	//	return
+	//}
+	//conn.Put()
 	token, err := EncodeDes(user, password)
 	if err != nil {
 		errorResponse(c, httperror.HTTP_GEN_TAOSD_TOKEN_ERR)

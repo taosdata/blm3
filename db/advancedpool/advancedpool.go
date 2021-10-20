@@ -1,12 +1,13 @@
 package advancedpool
 
 import (
+	"sync"
+	"unsafe"
+
 	"github.com/silenceper/pool"
 	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/driver-go/v2/af"
 	"github.com/taosdata/driver-go/v2/wrapper"
-	"sync"
-	"unsafe"
 )
 
 type AdvancePool struct {

@@ -4,6 +4,10 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
@@ -11,9 +15,6 @@ import (
 	"github.com/taosdata/blm3/tools/pool"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/af"
-	"io"
-	"net/http"
-	"time"
 )
 
 var logger = log.GetLogger("opentsdb")

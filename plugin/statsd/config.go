@@ -1,10 +1,11 @@
 package statsd
 
 import (
+	"time"
+
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/taosdata/driver-go/v2/common"
-	"time"
 )
 
 type Config struct {
