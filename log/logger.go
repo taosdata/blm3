@@ -2,14 +2,15 @@ package log
 
 import (
 	"fmt"
-	"github.com/lestrrat-go/file-rotatelogs"
-	"github.com/sirupsen/logrus"
-	"github.com/taosdata/blm3/config"
-	"github.com/taosdata/blm3/tools/pool"
 	"io"
 	"math/rand"
 	"path"
 	"time"
+
+	"github.com/lestrrat-go/file-rotatelogs"
+	"github.com/sirupsen/logrus"
+	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/tools/pool"
 )
 
 var logger = logrus.New()

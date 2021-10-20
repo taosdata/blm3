@@ -4,13 +4,24 @@ import (
 	"crypto/des"
 	"encoding/base64"
 	"errors"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
 	"github.com/taosdata/blm3/httperror"
 	"github.com/taosdata/blm3/tools"
 	"github.com/taosdata/blm3/tools/pool"
-	"net/http"
-	"strings"
 )
+
+var authCache = cache.New(30*time.Minute, time.Hour)
+var tokenCache = cache.New(30*time.Minute, time.Hour)
+
+type authInfo struct {
+	User     string
+	Password string
+}
 
 var desKey = []byte{
 	64,
@@ -62,6 +73,10 @@ func EncodeDes(user, password string) (string, error) {
 	for i := 0; i < len(password); i++ {
 		b[i+24] = password[i]
 	}
+	v, exist := tokenCache.Get(string(b))
+	if exist {
+		return v.(string), nil
+	}
 	block, err := des.NewCipher(desKey)
 	if err != nil {
 		return "", err
@@ -73,7 +88,9 @@ func EncodeDes(user, password string) (string, error) {
 		block.Encrypt(d, b[i*8:(i+1)*8])
 		buf.Write(d)
 	}
-	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+	data := base64.StdEncoding.EncodeToString(buf.Bytes())
+	tokenCache.SetDefault(string(b), data)
+	return data, nil
 }
 
 const (
@@ -88,6 +105,13 @@ func checkAuth(c *gin.Context) {
 		return
 	}
 	auth = strings.TrimSpace(auth)
+	v, exist := authCache.Get(auth)
+	if exist {
+		info := v.(*authInfo)
+		c.Set(UserKey, info.User)
+		c.Set(PasswordKey, info.Password)
+		return
+	}
 	if strings.HasPrefix(auth, "Basic") {
 		user, password, err := tools.DecodeBasic(auth[6:])
 		if err != nil {
@@ -98,6 +122,10 @@ func checkAuth(c *gin.Context) {
 			errorResponse(c, httperror.HTTP_INVALID_BASIC_AUTH)
 			return
 		}
+		authCache.SetDefault(auth, &authInfo{
+			User:     user,
+			Password: password,
+		})
 		c.Set(UserKey, user)
 		c.Set(PasswordKey, password)
 	} else if strings.HasPrefix(auth, "Taosd") {
@@ -110,6 +138,10 @@ func checkAuth(c *gin.Context) {
 			errorResponse(c, httperror.HTTP_INVALID_BASIC_AUTH)
 			return
 		}
+		authCache.SetDefault(auth, &authInfo{
+			User:     user,
+			Password: password,
+		})
 		c.Set(UserKey, user)
 		c.Set(PasswordKey, password)
 	} else {

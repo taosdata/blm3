@@ -2,6 +2,7 @@ package httperror
 
 const (
 	SUCCESS                      = 0x0
+	TSDB_CODE_RPC_AUTH_FAILURE   = 0x0003
 	HTTP_SERVER_OFFLINE          = 0x1100
 	HTTP_UNSUPPORT_URL           = 0x1101
 	HTTP_INVALID_URL             = 0x1102
@@ -100,6 +101,7 @@ const (
 )
 
 var ErrorMsgMap = map[int]string{
+	TSDB_CODE_RPC_AUTH_FAILURE:   "Authentication failure",
 	HTTP_SERVER_OFFLINE:          "http server is not onlin",
 	HTTP_UNSUPPORT_URL:           "url is not support",
 	HTTP_INVALID_URL:             "invalid url format",

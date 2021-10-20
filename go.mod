@@ -14,10 +14,11 @@ require (
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/lestrrat-go/strftime v1.0.5 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/silenceper/pool v1.0.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
-	github.com/taosdata/driver-go/v2 v2.0.1-0.20211013034636-b3b72d24bd55
+	github.com/taosdata/driver-go/v2 v2.0.1-0.20211018081904-0a2a3ef6c829
 )
