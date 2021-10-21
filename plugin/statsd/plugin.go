@@ -2,6 +2,8 @@ package statsd
 
 import (
 	"fmt"
+	"github.com/taosdata/blm3/db/commonpool"
+	"github.com/taosdata/blm3/schemaless/influxdb"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,10 +12,8 @@ import (
 	"github.com/influxdata/telegraf/plugins/inputs/statsd"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/sirupsen/logrus"
-	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
-	"github.com/taosdata/blm3/tools/influxdb/parse"
 )
 
 var logger = log.GetLogger("statsd")
@@ -114,11 +114,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Me
 		logger.WithError(err).Error("serialize statsd error")
 		return
 	}
-	lines, _, err := parse.Repair(data, "ns")
-	if err != nil {
-		logger.WithError(err).Error("serialize statsd error")
-	}
-	taosConn, err := advancedpool.GetAdvanceConnection(p.conf.User, p.conf.Password)
+	taosConn, err := commonpool.GetConnection(p.conf.User, p.conf.Password)
 	if err != nil {
 		logger.WithError(err).Errorln("connect taosd error")
 		return
@@ -129,23 +125,13 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metric telegraf.Me
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
-	conn := taosConn.TaosConnection
-	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s precision 'ns' update 2", p.conf.DB))
-	if err != nil {
-		logger.WithError(err).Errorln("create database error", p.conf.DB)
-		return
-	}
-	_, err = conn.Exec(fmt.Sprintf("use %s", p.conf.DB))
-	if err != nil {
-		logger.WithError(err).Error("change to database error", p.conf.DB)
-		return
-	}
+
 	start := time.Now()
-	logger.Debugln(start, "insert line", lines[0])
-	err = conn.InfluxDBInsertLines(lines, "ns")
-	logger.Debugln("insert line finish cost:", time.Now().Sub(start), lines)
-	if err != nil {
-		logger.WithError(err).Errorln("insert line error", lines)
+	logger.Debugln(start, "insert line", string(data))
+	result, err := influxdb.InsertInfluxdb(taosConn.TaosConnection, data, p.conf.DB, "ns")
+	logger.Debugln("insert line finish cost:", time.Now().Sub(start), string(data))
+	if err != nil || result.FailCount != 0 {
+		logger.WithError(err).WithField("result", result).Errorln("insert lines error", string(data))
 		return
 	}
 }
