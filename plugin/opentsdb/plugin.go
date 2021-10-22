@@ -3,13 +3,14 @@ package opentsdb
 import (
 	"bufio"
 	"errors"
-	"fmt"
+	"github.com/sirupsen/logrus"
+	"github.com/taosdata/blm3/db/commonpool"
+	"github.com/taosdata/blm3/schemaless/opentsdb"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/taosdata/blm3/db/advancedpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
 	"github.com/taosdata/blm3/tools/pool"
@@ -55,6 +56,7 @@ func (p *Plugin) Stop() error {
 }
 
 func (p *Plugin) insertJson(c *gin.Context) {
+	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
 	db := c.Param("db")
@@ -75,7 +77,7 @@ func (p *Plugin) insertJson(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
+	taosConn, err := commonpool.GetConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
@@ -87,22 +89,12 @@ func (p *Plugin) insertJson(c *gin.Context) {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
-	conn := taosConn.TaosConnection
-	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
-	if err != nil {
-		logger.WithError(err).Error("create database error", db)
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
+	var start time.Time
+	if isDebug {
+		start = time.Now()
 	}
-	_, err = conn.Exec(fmt.Sprintf("use %s", db))
-	if err != nil {
-		logger.WithError(err).Error("change to database error", db)
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
-	}
-	start := time.Now()
 	logger.Debug(start, "insert json payload", string(data))
-	err = conn.OpenTSDBInsertJsonPayload(string(data))
+	err = opentsdb.InsertJson(taosConn.TaosConnection, data, db)
 	logger.Debug("insert json payload cost:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Error("insert json payload error", string(data))
@@ -115,6 +107,7 @@ func (p *Plugin) insertJson(c *gin.Context) {
 func (p *Plugin) insertTelnet(c *gin.Context) {
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
+	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
 	db := c.Param("db")
 	if len(db) == 0 {
 		logger.Errorln("db required")
@@ -148,7 +141,7 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 		p.errorResponse(c, http.StatusBadRequest, err)
 		return
 	}
-	taosConn, err := advancedpool.GetAdvanceConnection(user, password)
+	taosConn, err := commonpool.GetConnection(user, password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
 		p.errorResponse(c, http.StatusInternalServerError, err)
@@ -160,22 +153,18 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 			logger.WithError(putErr).Errorln("taos connect pool put error")
 		}
 	}()
-	conn := taosConn.TaosConnection
-	_, err = conn.Exec(fmt.Sprintf("create database if not exists %s", db))
-	if err != nil {
-		logger.WithError(err).Error("create database error", db)
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
+	var start time.Time
+	if isDebug {
+		start = time.Now()
 	}
-	_, err = conn.Exec(fmt.Sprintf("use %s", db))
-	if err != nil {
-		logger.WithError(err).Error("change to database error", db)
-		p.errorResponse(c, http.StatusInternalServerError, err)
-		return
-	}
-	start := time.Now()
 	logger.Debug(start, "insert telnet payload", lines)
-	err = conn.OpenTSDBInsertTelnetLines(lines)
+	var errorList = make([]error, len(lines))
+	for _, line := range lines {
+		err := opentsdb.InsertTelnet(taosConn.TaosConnection, line, db)
+		if err != nil {
+			errorList = append(errorList, err)
+		}
+	}
 	logger.Debug("insert telnet payload cost:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithError(err).Error("insert telnet payload error", lines)

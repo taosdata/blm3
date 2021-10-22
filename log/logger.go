@@ -2,15 +2,13 @@ package log
 
 import (
 	"fmt"
-	"io"
-	"math/rand"
-	"path"
-	"time"
-
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/sirupsen/logrus"
 	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/blm3/tools/pool"
+	"io"
+	"os"
+	"path"
 )
 
 var logger = logrus.New()
@@ -77,7 +75,7 @@ func init() {
 }
 
 func randomID() string {
-	return fmt.Sprintf("%08v", rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(100000000))
+	return fmt.Sprintf("%08d", os.Getpid())
 }
 
 type TaosLogFormatter struct {

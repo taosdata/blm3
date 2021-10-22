@@ -21,4 +21,5 @@ require (
 	github.com/spf13/viper v1.9.0
 	github.com/stretchr/testify v1.7.0
 	github.com/taosdata/driver-go/v2 v2.0.1-0.20211018081904-0a2a3ef6c829
+	github.com/valyala/fastjson v1.6.3
 )
