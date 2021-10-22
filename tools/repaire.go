@@ -1,9 +1,10 @@
 package tools
 
 import (
+	"strings"
+
 	"github.com/taosdata/blm3/common"
 	"github.com/taosdata/blm3/tools/pool"
-	"strings"
 )
 
 func RepairName(s string) string {

@@ -3,13 +3,14 @@ package influxdb
 import (
 	"crypto/md5"
 	"fmt"
+	"sort"
+	"time"
+	"unsafe"
+
 	"github.com/influxdata/influxdb/v2/models"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/schemaless"
 	"github.com/taosdata/blm3/tools/pool"
-	"sort"
-	"time"
-	"unsafe"
 )
 
 type Result struct {

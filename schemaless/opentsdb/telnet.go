@@ -3,10 +3,11 @@ package opentsdb
 import (
 	"crypto/md5"
 	"fmt"
+	"unsafe"
+
 	"github.com/taosdata/blm3/schemaless"
 	"github.com/taosdata/blm3/schemaless/parser/opentsdb/telnet"
 	"github.com/taosdata/blm3/tools/pool"
-	"unsafe"
 )
 
 func InsertTelnet(taosConnect unsafe.Pointer, data, db string) error {
