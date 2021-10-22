@@ -44,7 +44,7 @@ Modify the collected configuration `/etc/collectd/collectd.conf`
 ```
 LoadPlugin network
 <Plugin network>
-         Server "127.0.0.1" "6043"
+         Server "127.0.0.1" "6045"
 </Plugin>
 ```
 
@@ -84,7 +84,7 @@ Usage of blm3:
       --collectd.db string                 collectd db name. Env "BLM_COLLECTD_DB" (default "collectd")
       --collectd.enable                    enable collectd. Env "BLM_COLLECTD_ENABLE" (default true)
       --collectd.password string           collectd password. Env "BLM_COLLECTD_PASSWORD" (default "taosdata")
-      --collectd.port int                  collectd server port. Env "BLM_COLLECTD_PORT" (default 6043)
+      --collectd.port int                  collectd server port. Env "BLM_COLLECTD_PORT" (default 6045)
       --collectd.user string               collectd user. Env "BLM_COLLECTD_USER" (default "root")
       --collectd.worker int                collectd write worker. Env "BLM_COLLECTD_WORKER" (default 10)
   -c, --config string                      config path default /etc/taos/blm.toml

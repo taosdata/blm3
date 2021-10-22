@@ -30,8 +30,8 @@ func init() {
 	viper.SetDefault("collectd.enable", true)
 
 	_ = viper.BindEnv("collectd.port", "BLM_COLLECTD_PORT")
-	pflag.Int("collectd.port", 6043, `collectd server port. Env "BLM_COLLECTD_PORT"`)
-	viper.SetDefault("collectd.port", 6043)
+	pflag.Int("collectd.port", 6045, `collectd server port. Env "BLM_COLLECTD_PORT"`)
+	viper.SetDefault("collectd.port", 6045)
 
 	_ = viper.BindEnv("collectd.db", "BLM_COLLECTD_DB")
 	pflag.String("collectd.db", "collectd", `collectd db name. Env "BLM_COLLECTD_DB"`)
