@@ -1,16 +1,16 @@
 package influxdb
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/taosdata/blm3/db/commonpool"
-	"github.com/taosdata/blm3/schemaless/influxdb"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
+	"github.com/taosdata/blm3/schemaless/influxdb"
 	"github.com/taosdata/blm3/tools"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/af"

@@ -2,9 +2,10 @@ package telnet
 
 import (
 	"fmt"
-	"github.com/taosdata/blm3/tools/pool"
 	"strings"
 	"sync"
+
+	"github.com/taosdata/blm3/tools/pool"
 )
 
 type Tags []*Tag

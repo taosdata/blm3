@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/taosdata/blm3/schemaless"
-	"github.com/taosdata/blm3/tools/pool"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
 	"unsafe"
+
+	"github.com/taosdata/blm3/schemaless"
+	"github.com/taosdata/blm3/tools/pool"
 )
 
 type PutData struct {

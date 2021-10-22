@@ -48,3 +48,18 @@ deleteCounters = true
 deleteGauges = true
 deleteSets = true
 deleteTimings = true
+
+[icinga2]
+enable = false
+db = "icinga2"
+user = "root"
+password = "taosdata"
+host = "https://localhost:5665"
+responseTimeout = "5s"
+httpUsername = ""
+httpPassword = ""
+caCertFile = ""
+certFile = ""
+keyFile = ""
+insecureSkipVerify = true
+gatherDuration = "5s"
