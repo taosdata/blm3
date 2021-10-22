@@ -3,16 +3,17 @@ package schemaless
 import (
 	"database/sql/driver"
 	"errors"
-	"github.com/taosdata/blm3/log"
-	"github.com/taosdata/blm3/tools"
-	"github.com/taosdata/blm3/tools/pool"
-	"github.com/taosdata/driver-go/v2/af"
-	tErrors "github.com/taosdata/driver-go/v2/errors"
 	"io"
 	"strconv"
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/taosdata/blm3/log"
+	"github.com/taosdata/blm3/tools"
+	"github.com/taosdata/blm3/tools/pool"
+	"github.com/taosdata/driver-go/v2/af"
+	tErrors "github.com/taosdata/driver-go/v2/errors"
 )
 
 const (
@@ -69,6 +70,16 @@ func (e *Executor) InsertTDengine(line *InsertLine) (string, error) {
 	if len(line.TagNames) != len(line.TagValues) {
 		return sql, tErrors.ErrTscLineSyntaxError
 	}
+	haveNotNullValue := false
+	for _, v := range line.Fields {
+		if v != nil {
+			haveNotNullValue = true
+			break
+		}
+	}
+	if !haveNotNullValue {
+		return sql, tErrors.ErrTscLineSyntaxError
+	}
 	err := e.DoExec(sql)
 	if err != nil {
 		var tdErr *tErrors.TaosError
@@ -80,13 +91,28 @@ func (e *Executor) InsertTDengine(line *InsertLine) (string, error) {
 				if err != nil {
 					return sql, err
 				}
-				err = e.modifyTag(line.DB, line.STableName, line.TagNames, line.TagValues)
+				tableInfo, err := e.DescribeTable(line.DB, line.STableName)
+				if err != nil {
+					return sql, err
+				}
+				err = e.modifyTag(line.DB, line.STableName, tableInfo, line.TagNames, line.TagValues)
+				if err != nil {
+					return sql, err
+				}
+				err = e.modifyColumn(line.DB, line.STableName, tableInfo, line.Fields)
 				if err != nil {
 					return sql, err
 				}
 			case tErrors.TSC_INVALID_OPERATION:
-				//tag not exist
-				err = e.modifyTag(line.DB, line.STableName, line.TagNames, line.TagValues)
+				tableInfo, err := e.DescribeTable(line.DB, line.STableName)
+				if err != nil {
+					return sql, err
+				}
+				err = e.modifyTag(line.DB, line.STableName, tableInfo, line.TagNames, line.TagValues)
+				if err != nil {
+					return sql, err
+				}
+				err = e.modifyColumn(line.DB, line.STableName, tableInfo, line.Fields)
 				if err != nil {
 					return sql, err
 				}
@@ -100,9 +126,28 @@ func (e *Executor) InsertTDengine(line *InsertLine) (string, error) {
 				if err != nil {
 					return sql, err
 				}
-				err = e.modifyTag(line.DB, line.STableName, line.TagNames, line.TagValues)
+				tableInfo, err := e.DescribeTable(line.DB, line.STableName)
 				if err != nil {
 					return sql, err
+				}
+				err = e.modifyTag(line.DB, line.STableName, tableInfo, line.TagNames, line.TagValues)
+				if err != nil {
+					return sql, err
+				}
+				err = e.modifyColumn(line.DB, line.STableName, tableInfo, line.Fields)
+				if err != nil {
+					return sql, err
+				}
+			case tErrors.TSC_SQL_SYNTAX_ERROR:
+				if strings.Contains(tdErr.ErrStr, "string data overflow") {
+					tableInfo, err := e.DescribeTable(line.DB, line.STableName)
+					if err != nil {
+						return sql, err
+					}
+					err = e.modifyColumn(line.DB, line.STableName, tableInfo, line.Fields)
+					if err != nil {
+						return sql, err
+					}
 				}
 			default:
 				return sql, err
@@ -140,38 +185,11 @@ func (e *Executor) createStable(info *InsertLine) error {
 	}
 	columns := make([]*FieldInfo, 0, len(info.Fields))
 	for columnName, columnValue := range info.Fields {
-		if columnValue == nil {
+		filed := e.createFieldInfo(columnName, columnValue)
+		if filed == nil {
 			continue
-		}
-		switch columnValue.(type) {
-		case float64:
-			columns = append(columns, &FieldInfo{
-				Name: tools.RepairName(columnName),
-				Type: DOUBLEType,
-			})
-		case int64:
-			columns = append(columns, &FieldInfo{
-				Name: tools.RepairName(columnName),
-				Type: BIGINTType,
-			})
-		case uint64:
-			columns = append(columns, &FieldInfo{
-				Name:   tools.RepairName(columnName),
-				Type:   UBIGINTType,
-				Length: 0,
-			})
-		case string:
-			columns = append(columns, &FieldInfo{
-				Name:   tools.RepairName(columnName),
-				Type:   BINARYType,
-				Length: len(columnValue.(string)),
-			})
-		case bool:
-			columns = append(columns, &FieldInfo{
-				Name:   tools.RepairName(columnName),
-				Type:   BOOLType,
-				Length: 0,
-			})
+		} else {
+			columns = append(columns, filed)
 		}
 	}
 	err := e.CreateSTable(info.DB, info.STableName, &TableInfo{
@@ -250,11 +268,44 @@ func (e *Executor) DoExec(sql string) error {
 	return err
 }
 
-func (e *Executor) modifyTag(db string, stableName string, tagName, tagValue []string) error {
-	tableInfo, err := e.DescribeTable(db, stableName)
-	if err != nil {
-		return err
+func (e *Executor) createFieldInfo(name string, value interface{}) *FieldInfo {
+	if value == nil {
+		return nil
 	}
+	switch value.(type) {
+	case float64, float32:
+		return &FieldInfo{
+			Name: tools.RepairName(name),
+			Type: DOUBLEType,
+		}
+	case int64, int, int8, int16, int32:
+		return &FieldInfo{
+			Name: tools.RepairName(name),
+			Type: BIGINTType,
+		}
+	case uint64, uint, uint8, uint16, uint32:
+		return &FieldInfo{
+			Name:   tools.RepairName(name),
+			Type:   UBIGINTType,
+			Length: 0,
+		}
+	case string:
+		return &FieldInfo{
+			Name:   tools.RepairName(name),
+			Type:   BINARYType,
+			Length: len(value.(string)),
+		}
+	case bool:
+		return &FieldInfo{
+			Name:   tools.RepairName(name),
+			Type:   BOOLType,
+			Length: 0,
+		}
+	}
+	return nil
+}
+func (e *Executor) modifyTag(db string, stableName string, tableInfo *TableInfo, tagName, tagValue []string) error {
+
 	tagMap := map[string]string{}
 	for i := 0; i < len(tagName); i++ {
 		tagMap[tools.RepairName(tagName[i])] = tagValue[i]
@@ -292,7 +343,7 @@ func (e *Executor) modifyTag(db string, stableName string, tagName, tagValue []s
 	}
 	if len(modifyLen) > 0 {
 		for s, i := range modifyLen {
-			err = e.ModifyTagLength(db, stableName, &FieldInfo{
+			err := e.ModifyTagLength(db, stableName, &FieldInfo{
 				Name:   s,
 				Type:   BINARYType,
 				Length: i,
@@ -301,6 +352,65 @@ func (e *Executor) modifyTag(db string, stableName string, tagName, tagValue []s
 				var addTagErr *tErrors.TaosError
 				if errors.As(err, &addTagErr) {
 					if addTagErr.Code == tErrors.TSC_INVALID_TAG_LENGTH {
+						continue
+					} else {
+						return addTagErr
+					}
+				} else {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (e *Executor) modifyColumn(db string, stableName string, tableInfo *TableInfo, column map[string]interface{}) error {
+	columnMap := make(map[string]interface{}, len(column))
+	for s, i := range column {
+		columnMap[tools.RepairName(s)] = i
+	}
+	modifyLen := map[string]int{}
+	for _, column := range tableInfo.Fields {
+		t, exist := columnMap[column.Name]
+		if exist {
+			if column.Type == BINARYType && column.Length < len(t.(string)) {
+				modifyLen[column.Name] = len(t.(string))
+			}
+		}
+		delete(columnMap, column.Name)
+	}
+	if len(columnMap) > 0 {
+		for columnName, columnValue := range columnMap {
+			field := e.createFieldInfo(columnName, columnValue)
+			if field != nil {
+				err := e.AddColumn(db, stableName, field)
+				if err != nil {
+					var addTagErr *tErrors.TaosError
+					if errors.As(err, &addTagErr) {
+						if addTagErr.Code == tErrors.TSC_INVALID_OPERATION {
+							continue
+						} else {
+							return addTagErr
+						}
+					} else {
+						return err
+					}
+				}
+			}
+		}
+	}
+	if len(modifyLen) > 0 {
+		for s, i := range modifyLen {
+			err := e.ModifyColumnLength(db, stableName, &FieldInfo{
+				Name:   s,
+				Type:   BINARYType,
+				Length: i,
+			})
+			if err != nil {
+				var addTagErr *tErrors.TaosError
+				if errors.As(err, &addTagErr) {
+					if addTagErr.Code == tErrors.TSC_INVALID_COLUMN_LENGTH {
 						continue
 					} else {
 						return addTagErr
@@ -387,7 +497,18 @@ func (e *Executor) AddTag(db, tableName string, info *FieldInfo) error {
 	err := e.DoExec(b.String())
 	return err
 }
-
+func (e *Executor) AddColumn(db, tableName string, info *FieldInfo) error {
+	b := pool.BytesPoolGet()
+	defer pool.BytesPoolPut(b)
+	b.WriteString("alter stable ")
+	b.WriteString(db)
+	b.WriteByte('.')
+	b.WriteString(tableName)
+	b.WriteString(" add column ")
+	b.WriteString(e.generateFieldSql(info))
+	err := e.DoExec(b.String())
+	return err
+}
 func (e *Executor) ModifyTagLength(db, tableName string, info *FieldInfo) error {
 	b := pool.BytesPoolGet()
 	defer pool.BytesPoolPut(b)
@@ -396,6 +517,19 @@ func (e *Executor) ModifyTagLength(db, tableName string, info *FieldInfo) error 
 	b.WriteByte('.')
 	b.WriteString(tableName)
 	b.WriteString(" modify TAG ")
+	b.WriteString(e.generateFieldSql(info))
+	err := e.DoExec(b.String())
+	return err
+}
+
+func (e *Executor) ModifyColumnLength(db, tableName string, info *FieldInfo) error {
+	b := pool.BytesPoolGet()
+	defer pool.BytesPoolPut(b)
+	b.WriteString("alter stable ")
+	b.WriteString(db)
+	b.WriteByte('.')
+	b.WriteString(tableName)
+	b.WriteString(" modify COLUMN ")
 	b.WriteString(e.generateFieldSql(info))
 	err := e.DoExec(b.String())
 	return err
@@ -443,6 +577,9 @@ func (e *Executor) generateInsertSql(line *InsertLine) string {
 	b.WriteString(" (ts")
 	values := make([]interface{}, 0, len(line.Fields))
 	for k, v := range line.Fields {
+		if v == nil {
+			continue
+		}
 		b.WriteByte(',')
 		b.WriteString(tools.RepairName(k))
 		values = append(values, v)
@@ -456,12 +593,30 @@ func (e *Executor) generateInsertSql(line *InsertLine) string {
 			b.WriteString("null")
 		} else {
 			switch v := value.(type) {
+			case int:
+				b.WriteString(strconv.FormatInt(int64(v), 10))
+			case int8:
+				b.WriteString(strconv.FormatInt(int64(v), 10))
+			case int16:
+				b.WriteString(strconv.FormatInt(int64(v), 10))
+			case int32:
+				b.WriteString(strconv.FormatInt(int64(v), 10))
 			case int64:
 				b.WriteString(strconv.FormatInt(v, 10))
+			case uint:
+				b.WriteString(strconv.FormatUint(uint64(v), 10))
+			case uint8:
+				b.WriteString(strconv.FormatUint(uint64(v), 10))
+			case uint16:
+				b.WriteString(strconv.FormatUint(uint64(v), 10))
+			case uint32:
+				b.WriteString(strconv.FormatUint(uint64(v), 10))
 			case uint64:
 				b.WriteString(strconv.FormatUint(v, 10))
 			case float64:
 				b.WriteString(strconv.FormatFloat(v, 'f', -1, 64))
+			case float32:
+				b.WriteString(strconv.FormatFloat(float64(v), 'f', -1, 32))
 			case bool:
 				if v {
 					b.WriteString("true")

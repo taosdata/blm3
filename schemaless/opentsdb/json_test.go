@@ -1,9 +1,10 @@
 package opentsdb
 
 import (
-	"github.com/taosdata/driver-go/v2/wrapper"
 	"testing"
 	"unsafe"
+
+	"github.com/taosdata/driver-go/v2/wrapper"
 )
 
 func TestInsertJson(t *testing.T) {

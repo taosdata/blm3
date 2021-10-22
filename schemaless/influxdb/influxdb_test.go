@@ -1,10 +1,11 @@
 package influxdb
 
 import (
-	"github.com/taosdata/driver-go/v2/wrapper"
 	"reflect"
 	"testing"
 	"unsafe"
+
+	"github.com/taosdata/driver-go/v2/wrapper"
 )
 
 func TestInsertInfluxdb(t *testing.T) {

@@ -2,11 +2,12 @@ package collectd
 
 import (
 	"fmt"
-	"github.com/taosdata/blm3/db/commonpool"
-	"github.com/taosdata/blm3/schemaless/influxdb"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/taosdata/blm3/db/commonpool"
+	"github.com/taosdata/blm3/schemaless/influxdb"
 
 	"github.com/gin-gonic/gin"
 	"github.com/influxdata/telegraf"
