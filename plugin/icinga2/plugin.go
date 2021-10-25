@@ -34,7 +34,7 @@ type Icinga2 struct {
 func (p *Icinga2) Init(_ gin.IRouter) error {
 	p.conf.setValue()
 	if !p.conf.Enable {
-		logger.Info("influxdb disabled")
+		logger.Info("icinga2 disabled")
 		return nil
 	}
 	if p.conf.ResponseTimeout < time.Second {
