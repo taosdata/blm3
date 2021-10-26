@@ -1,7 +1,6 @@
 package opentsdbtelnet
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"net"
@@ -94,22 +93,38 @@ func (p *Plugin) handler(conn *net.TCPConn, id uint64) {
 		p.accept <- true
 		p.forget(id)
 	}()
-	scanner := bufio.NewScanner(conn)
+	buffer := make([]byte, 0, 1024)
+	d := make([]byte, 1024)
 	for {
 		select {
 		case <-p.done:
 			return
 		default:
-			if !scanner.Scan() {
+			n, err := conn.Read(d)
+			if err != nil {
+				fmt.Println(err)
 				return
 			}
-			if len(scanner.Bytes()) == 0 {
+			if n == 0 {
 				continue
 			}
-			select {
-			case p.in <- scanner.Bytes():
-			default:
-				logger.Errorln("can not handle more message so far. increase opentsdb_telnet.worker")
+			buffer = append(buffer, d[:n]...)
+			customIndex := 0
+			for i := len(buffer) - 1; i > 0; i-- {
+				if buffer[i] == '\n' {
+					customIndex = i
+					break
+				}
+			}
+			if customIndex > 0 {
+				data := make([]byte, customIndex)
+				copy(data, buffer[:customIndex])
+				buffer = buffer[customIndex+1:]
+				select {
+				case p.in <- data:
+				default:
+					logger.Errorln("can not handle more message so far. increase opentsdb_telnet.worker")
+				}
 			}
 		}
 	}
@@ -158,11 +173,11 @@ func (p *Plugin) tcpListen(listener *net.TCPListener) error {
 				return err
 			}
 
-			//if p.conf.TCPKeepAlive {
-			//	if err = conn.SetKeepAlive(true); err != nil {
-			//		return err
-			//	}
-			//}
+			if p.conf.TCPKeepAlive {
+				if err = conn.SetKeepAlive(true); err != nil {
+					return err
+				}
+			}
 
 			select {
 			case <-p.accept:

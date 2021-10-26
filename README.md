@@ -65,17 +65,17 @@ port: 8125
 }
 ```
 
-## icinga2
+## icinga2 restful
 
 gather services & hosts status using icinga2 remote api
-
-### restful
 
 * Follow the doc to open icinga2 remote
   api [https://icinga.com/docs/icinga-2/latest/doc/12-icinga2-api/](https://icinga.com/docs/icinga-2/latest/doc/12-icinga2-api/)
 * Configure blm3 `icinga2` related parameters
 
-### opentsdb writer
+## icinga2 opentsdb writer
+
+collect check result metrics and performance data
 
 * Follow the doc to enable
   opentsdb-writer [https://icinga.com/docs/icinga-2/latest/doc/14-features/#opentsdb-writer](https://icinga.com/docs/icinga-2/latest/doc/14-features/#opentsdb-writer)

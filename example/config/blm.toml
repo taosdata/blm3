@@ -24,14 +24,6 @@ enable = true
 [influxdb]
 enable = true
 
-[collectd]
-enable = true
-port = 6045
-db = "collectd"
-user = "root"
-password = "taosdata"
-worker = 10
-
 [statsd]
 enable = true
 port = 6044
@@ -49,6 +41,14 @@ deleteGauges = true
 deleteSets = true
 deleteTimings = true
 
+[collectd]
+enable = true
+port = 6045
+db = "collectd"
+user = "root"
+password = "taosdata"
+worker = 10
+
 [icinga2]
 enable = false
 db = "icinga2"
@@ -63,3 +63,13 @@ certFile = ""
 keyFile = ""
 insecureSkipVerify = true
 gatherDuration = "5s"
+
+[opentsdb_telnet]
+enable = false
+port = 6046
+maxTCPConnections = 250
+tcpKeepAlive = false
+db = "opentsdb_telnet"
+user = "root"
+password = "taosdata"
+worker = 100

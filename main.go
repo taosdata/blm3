@@ -66,7 +66,7 @@ func main() {
 		Handler:           router,
 		ReadHeaderTimeout: 20 * time.Second,
 		ReadTimeout:       200 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      90 * time.Second,
 	}
 	logger.Println("server on :", config.Conf.Port)
 	if config.Conf.SSl.Enable {
