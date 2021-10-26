@@ -38,13 +38,6 @@ func (p *Plugin) Init(_ gin.IRouter) error {
 		return nil
 	}
 	p.accept = make(chan bool, p.conf.MaxTCPConnections)
-	p.connList = make(map[uint64]*net.TCPConn)
-	for i := 0; i < p.conf.MaxTCPConnections; i++ {
-		p.accept <- true
-	}
-	p.in = make(chan []byte, p.conf.Worker*2)
-	p.done = make(chan struct{})
-
 	return nil
 }
 
@@ -52,6 +45,12 @@ func (p *Plugin) Start() error {
 	if !p.conf.Enable {
 		return nil
 	}
+	p.connList = make(map[uint64]*net.TCPConn)
+	for i := 0; i < p.conf.MaxTCPConnections; i++ {
+		p.accept <- true
+	}
+	p.in = make(chan []byte, p.conf.Worker*2)
+	p.done = make(chan struct{})
 	err := p.tcp(p.conf.Port)
 	if err != nil {
 		return err
@@ -60,9 +59,16 @@ func (p *Plugin) Start() error {
 }
 
 func (p *Plugin) Stop() error {
-	logger.Infof("Stopping the statsd service")
-	close(p.done)
-	p.TCPListener.Close()
+	if !p.conf.Enable {
+		return nil
+	}
+	if p.done != nil {
+		close(p.done)
+	}
+	if p.TCPListener != nil {
+		p.TCPListener.Close()
+		p.TCPListener = nil
+	}
 	var tcpConnList []*net.TCPConn
 	p.cleanup.Lock()
 	for _, conn := range p.connList {
@@ -72,7 +78,6 @@ func (p *Plugin) Stop() error {
 	for _, conn := range tcpConnList {
 		conn.Close()
 	}
-
 	p.wg.Wait()
 	close(p.in)
 	return nil
