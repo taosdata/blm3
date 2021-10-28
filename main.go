@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -51,6 +52,7 @@ func createRouter(debug bool, corsConf *config.CorsConfig, enableGzip bool) *gin
 }
 
 func main() {
+	runtime.GOMAXPROCS(200)
 	config.Init()
 	log.ConfigLog()
 	db.PrepareConnection()

@@ -134,6 +134,7 @@ func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTi
 		}
 		logger.Debugln("taos put connect cost:", time.Now().Sub(s))
 	}()
+
 	if len(db) > 0 {
 		if isDebug {
 			s = time.Now()
@@ -152,9 +153,11 @@ func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTi
 		}
 	}
 	startExec := time.Now()
+
 	logger.Debugln(startExec, "start execute sql:", sql)
 	result = wrapper.TaosQuery(taosConnect.TaosConnection, sql)
 	logger.Debugln("execute sql cost:", time.Now().Sub(startExec))
+
 	if isDebug {
 		s = time.Now()
 	}
