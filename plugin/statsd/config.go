@@ -81,8 +81,8 @@ func init() {
 	pflag.Int("statsd.maxTCPConnections", 250, `statsd max tcp connections. Env "BLM_STATSD_MAX_TCP_CONNECTIONS"`)
 	viper.SetDefault("statsd.maxTCPConnections", 250)
 
-	_ = viper.BindEnv("statsd.tcpKeepAlive", "BLM_COLLECTD_TCP_KEEP_ALIVE")
-	pflag.Bool("statsd.tcpKeepAlive", false, `enable tcp keep alive. Env "BLM_COLLECTD_TCP_KEEP_ALIVE"`)
+	_ = viper.BindEnv("statsd.tcpKeepAlive", "BLM_STATSD_TCP_KEEP_ALIVE")
+	pflag.Bool("statsd.tcpKeepAlive", false, `enable tcp keep alive. Env "BLM_STATSD_TCP_KEEP_ALIVE"`)
 	viper.SetDefault("statsd.tcpKeepAlive", false)
 
 	_ = viper.BindEnv("statsd.allowPendingMessages", "BLM_STATSD_ALLOW_PENDING_MESSAGES")

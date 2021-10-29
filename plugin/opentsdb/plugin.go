@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -158,17 +159,17 @@ func (p *Plugin) insertTelnet(c *gin.Context) {
 		start = time.Now()
 	}
 	logger.Debug(start, "insert telnet payload", lines)
-	var errorList = make([]error, len(lines))
+	var errorList = make([]string, 0, len(lines))
 	for _, line := range lines {
 		err := opentsdb.InsertTelnet(taosConn.TaosConnection, line, db)
 		if err != nil {
-			errorList = append(errorList, err)
+			errorList = append(errorList, err.Error())
 		}
 	}
 	logger.Debug("insert telnet payload cost:", time.Now().Sub(start))
-	if err != nil {
-		logger.WithError(err).Error("insert telnet payload error", lines)
-		p.errorResponse(c, http.StatusInternalServerError, err)
+	if len(errorList) != 0 {
+		logger.WithError(errors.New(strings.Join(errorList, ","))).Error("insert telnet payload error", lines)
+		p.errorResponse(c, http.StatusInternalServerError, errors.New(strings.Join(errorList, ",")))
 		return
 	}
 	p.successResponse(c)

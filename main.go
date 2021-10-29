@@ -21,6 +21,7 @@ import (
 	_ "github.com/taosdata/blm3/plugin/icinga2"
 	_ "github.com/taosdata/blm3/plugin/influxdb"
 	_ "github.com/taosdata/blm3/plugin/opentsdb"
+	_ "github.com/taosdata/blm3/plugin/opentsdbtelnet"
 	_ "github.com/taosdata/blm3/plugin/statsd"
 	"github.com/taosdata/blm3/rest"
 )
@@ -65,7 +66,7 @@ func main() {
 		Handler:           router,
 		ReadHeaderTimeout: 20 * time.Second,
 		ReadTimeout:       200 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      90 * time.Second,
 	}
 	logger.Println("server on :", config.Conf.Port)
 	if config.Conf.SSl.Enable {
