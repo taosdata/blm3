@@ -6,7 +6,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/taosdata/blm3/thread"
 	"github.com/taosdata/driver-go/v2/wrapper"
 )
 
@@ -62,9 +61,9 @@ func (p *Pool) Get() (*list.Element, error) {
 	if p.usingList.Len()+p.idleList.Len() < p.maxConnect {
 		var conn unsafe.Pointer
 		var err error
-		thread.Lock()
+		//thread.Lock()
 		conn, err = wrapper.TaosConnect("", p.user, p.password, "", 0)
-		thread.Unlock()
+		//thread.Unlock()
 		if err != nil {
 			return nil, err
 		}
@@ -82,18 +81,18 @@ func (p *Pool) Put(e *list.Element) error {
 	if p.maxIdle > 0 {
 		if p.idleList.Len() >= p.maxIdle {
 			p.idleLock.Unlock()
-			thread.Lock()
+			//thread.Lock()
 			wrapper.TaosClose(taosConnect)
-			thread.Unlock()
+			//thread.Unlock()
 			return nil
 		}
 		p.usingLock.Lock()
 		if p.idleList.Len()+p.usingList.Len() >= p.maxConnect {
 			p.idleLock.Unlock()
 			p.usingLock.Unlock()
-			thread.Lock()
+			//thread.Lock()
 			wrapper.TaosClose(taosConnect)
-			thread.Unlock()
+			//thread.Unlock()
 			return nil
 		}
 		p.usingLock.Unlock()
@@ -139,9 +138,9 @@ func (p *Pool) Release() {
 	for {
 		if f != nil {
 			v := f.Value.(unsafe.Pointer)
-			thread.Lock()
+			//thread.Lock()
 			wrapper.TaosClose(v)
-			thread.Unlock()
+			//thread.Unlock()
 		} else {
 			break
 		}
@@ -152,9 +151,9 @@ func (p *Pool) Release() {
 	for {
 		if f != nil {
 			v := f.Value.(unsafe.Pointer)
-			thread.Lock()
+			//thread.Lock()
 			wrapper.TaosClose(v)
-			thread.Unlock()
+			//thread.Unlock()
 		} else {
 			break
 		}
