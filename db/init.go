@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/db/async"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/driver-go/v2/common"
 	"github.com/taosdata/driver-go/v2/errors"
@@ -23,4 +24,5 @@ func PrepareConnection() {
 			}
 		})
 	}
+	async.GlobalAsync = async.NewAsync(async.NewHandlerPool(10000))
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/taosdata/blm3/config"
+	"github.com/taosdata/blm3/db"
 )
 
 var router *gin.Engine
@@ -18,6 +19,7 @@ func TestMain(m *testing.M) {
 	viper.Set("pool.maxConnect", 10000)
 	viper.Set("pool.maxIdle", 10000)
 	config.Init()
+	db.PrepareConnection()
 	gin.SetMode(gin.ReleaseMode)
 	router = gin.New()
 	router.Use(func(context *gin.Context) {

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -25,6 +24,7 @@ import (
 	_ "github.com/taosdata/blm3/plugin/opentsdbtelnet"
 	_ "github.com/taosdata/blm3/plugin/statsd"
 	"github.com/taosdata/blm3/rest"
+	_ "go.uber.org/automaxprocs"
 )
 
 var logger = log.GetLogger("main")
@@ -52,7 +52,6 @@ func createRouter(debug bool, corsConf *config.CorsConfig, enableGzip bool) *gin
 }
 
 func main() {
-	runtime.GOMAXPROCS(200)
 	config.Init()
 	log.ConfigLog()
 	db.PrepareConnection()

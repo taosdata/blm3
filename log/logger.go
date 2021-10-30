@@ -1,28 +1,29 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path"
 
-	"github.com/lestrrat-go/file-rotatelogs"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/sirupsen/logrus"
 	"github.com/taosdata/blm3/config"
-	"github.com/taosdata/blm3/tools/pool"
 )
 
 var logger = logrus.New()
 var ServerID = randomID()
-var globalLogFormatter = &TaosLogFormatter{}
+var globalLogFormatter = &TaosLogFormatter{buffer: &bytes.Buffer{}}
 
 type FileHook struct {
 	formatter logrus.Formatter
 	writer    io.Writer
+	buf       *bytes.Buffer
 }
 
 func NewFileHook(formatter logrus.Formatter, writer io.Writer) *FileHook {
-	return &FileHook{formatter: formatter, writer: writer}
+	return &FileHook{formatter: formatter, writer: writer, buf: &bytes.Buffer{}}
 }
 
 func (f *FileHook) Levels() []logrus.Level {
@@ -34,9 +35,13 @@ func (f *FileHook) Fire(entry *logrus.Entry) error {
 	if err != nil {
 		return err
 	}
-	_, err = f.writer.Write(data)
-	if err != nil {
-		return err
+	f.buf.Write(data)
+	if f.buf.Len() > 1024 {
+		_, err = f.writer.Write(f.buf.Bytes())
+		f.buf.Reset()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -80,25 +85,25 @@ func randomID() string {
 }
 
 type TaosLogFormatter struct {
+	buffer *bytes.Buffer
 }
 
 func (t *TaosLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	b := pool.BytesPoolGet()
-	defer pool.BytesPoolPut(b)
-	b.WriteString(entry.Time.Format("01/02 15:04:05.000000"))
-	b.WriteByte(' ')
-	b.WriteString(ServerID)
-	b.WriteString(" BLM ")
-	b.WriteString(entry.Level.String())
-	b.WriteString(` "`)
-	b.WriteString(entry.Message)
-	b.WriteByte('"')
+	t.buffer.Reset()
+	t.buffer.WriteString(entry.Time.Format("01/02 15:04:05.000000"))
+	t.buffer.WriteByte(' ')
+	t.buffer.WriteString(ServerID)
+	t.buffer.WriteString(" BLM ")
+	t.buffer.WriteString(entry.Level.String())
+	t.buffer.WriteString(` "`)
+	t.buffer.WriteString(entry.Message)
+	t.buffer.WriteByte('"')
 	for k, v := range entry.Data {
-		b.WriteByte(' ')
-		b.WriteString(k)
-		b.WriteByte('=')
-		b.WriteString(fmt.Sprintf("%v", v))
+		t.buffer.WriteByte(' ')
+		t.buffer.WriteString(k)
+		t.buffer.WriteByte('=')
+		t.buffer.WriteString(fmt.Sprintf("%v", v))
 	}
-	b.WriteByte('\n')
-	return b.Bytes(), nil
+	t.buffer.WriteByte('\n')
+	return t.buffer.Bytes(), nil
 }
