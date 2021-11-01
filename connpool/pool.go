@@ -9,7 +9,7 @@ import (
 	"github.com/taosdata/driver-go/v2/wrapper"
 )
 
-var TooManyConnectError = errors.New("too many connect")
+var TooManyConnectError = errors.New("too many connections")
 
 type Pool struct {
 	usingLock  sync.RWMutex

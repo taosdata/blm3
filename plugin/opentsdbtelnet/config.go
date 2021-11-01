@@ -57,6 +57,6 @@ func init() {
 	viper.SetDefault("opentsdb_telnet.password", common.DefaultPassword)
 
 	_ = viper.BindEnv("opentsdb_telnet.worker", "BLM_OPENTSDB_TELNET_WORKER")
-	pflag.Int("opentsdb_telnet.worker", 100, `opentsdb_telnet write worker. Env "BLM_OPENTSDB_TELNET_WORKER"`)
-	viper.SetDefault("opentsdb_telnet.worker", 100)
+	pflag.Int("opentsdb_telnet.worker", 1000, `opentsdb_telnet write worker. Env "BLM_OPENTSDB_TELNET_WORKER"`)
+	viper.SetDefault("opentsdb_telnet.worker", 1000)
 }

@@ -1,8 +1,8 @@
 package opentsdbtelnet
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -18,13 +18,14 @@ import (
 )
 
 var logger = log.GetLogger("opentsdb_telnet")
+var versionCommand = "version"
 
 type Plugin struct {
 	conf        Config
 	done        chan struct{}
 	id          uint64
 	accept      chan bool
-	in          chan []byte
+	in          chan []string
 	wg          sync.WaitGroup
 	cleanup     sync.Mutex
 	TCPListener *net.TCPListener
@@ -49,7 +50,7 @@ func (p *Plugin) Start() error {
 	for i := 0; i < p.conf.MaxTCPConnections; i++ {
 		p.accept <- true
 	}
-	p.in = make(chan []byte, p.conf.Worker*2)
+	p.in = make(chan []string, p.conf.Worker*2)
 	p.done = make(chan struct{})
 	err := p.tcp(p.conf.Port)
 	if err != nil {
@@ -107,7 +108,9 @@ func (p *Plugin) handler(conn *net.TCPConn, id uint64) {
 		default:
 			n, err := conn.Read(d)
 			if err != nil {
-				fmt.Println(err)
+				if err != io.EOF {
+					logger.WithError(err).Error("conn read")
+				}
 				return
 			}
 			if n == 0 {
@@ -121,15 +124,30 @@ func (p *Plugin) handler(conn *net.TCPConn, id uint64) {
 					break
 				}
 			}
+
 			if customIndex > 0 {
 				data := make([]byte, customIndex)
 				copy(data, buffer[:customIndex])
 				buffer = buffer[customIndex+1:]
+				lines := strings.Split(string(data), "\n")
+				insertLines := make([]string, 0, len(lines))
+				for _, line := range lines {
+					if len(line) == 0 {
+						continue
+					}
+					if line == versionCommand {
+						conn.Write([]byte{'1'})
+						continue
+					} else {
+						insertLines = append(insertLines, line)
+					}
+				}
 				select {
-				case p.in <- data:
+				case p.in <- insertLines:
 				default:
 					logger.Errorln("can not handle more message so far. increase opentsdb_telnet.worker")
 				}
+
 			}
 		}
 	}
@@ -226,8 +244,7 @@ func (p *Plugin) parser() {
 	}
 }
 
-func (p *Plugin) handleData(data []byte) {
-	lines := strings.Split(string(data), "\n")
+func (p *Plugin) handleData(lines []string) {
 	taosConn, err := commonpool.GetConnection(p.conf.User, p.conf.Password)
 	if err != nil {
 		logger.WithError(err).Error("connect taosd error")
@@ -243,18 +260,13 @@ func (p *Plugin) handleData(data []byte) {
 	if logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 		start = time.Now()
 	}
-	logger.Debug(start, "insert telnet payload", lines)
-	var errorList = make([]string, 0, len(lines))
 	for _, line := range lines {
-		err := opentsdb.InsertTelnet(taosConn.TaosConnection, line, p.conf.DB)
+		logger.Debug(start, "insert telnet payload", line)
+		err = opentsdb.InsertTelnet(taosConn.TaosConnection, line, p.conf.DB)
 		if err != nil {
-			errorList = append(errorList, err.Error())
+			logger.WithError(err).Error("insert telnet payload error", line)
 		}
-	}
-	logger.Debug("insert telnet payload cost:", time.Now().Sub(start))
-	if len(errorList) != 0 {
-		logger.WithError(errors.New(strings.Join(errorList, ","))).Error("insert telnet payload error", lines)
-		return
+		logger.Debug("insert telnet payload cost:", time.Now().Sub(start))
 	}
 }
 

@@ -89,6 +89,11 @@ object OpenTsdbWriter "opentsdb" {
 }
 ```
 
+## TCollector
+tcollector is a client-side process that gathers data from local collectors and pushes the data to OpenTSDB. You run it on all your hosts, and it does the work of sending each host’s data to the TSD.
+* Enable blm3 configuration `opentsdb_telnet.enable`
+* Modify the TCollector configuration file, modify the opentsdb host to the host where blm is deployed, and modify the port to 6046
+
 ## Configuration
 
 Support command line parameters, environment variables and configuration files
@@ -139,10 +144,9 @@ Usage of blm3:
       --opentsdb_telnet.port int                opentsdb telnet tcp port. Env "BLM_OPENTSDB_TELNET_PORT" (default 6046)
       --opentsdb_telnet.tcpKeepAlive            enable tcp keep alive. Env "BLM_OPENTSDB_TELNET_TCP_KEEP_ALIVE"
       --opentsdb_telnet.user string             opentsdb_telnet user. Env "BLM_OPENTSDB_TELNET_USER" (default "root")
-      --opentsdb_telnet.worker int              opentsdb_telnet write worker. Env "BLM_OPENTSDB_TELNET_WORKER" (default 100)
-      --pool.idleTimeout duration               Set idle connection timeout. Env "BLM_POOL_IDLE_TIMEOUT" (default 1m0s)
-      --pool.maxConnect int                     max connections to taosd. Env "BLM_POOL_MAX_CONNECT" (default 100)
-      --pool.maxIdle int                        max idle connections to taosd. Env "BLM_POOL_MAX_IDLE" (default 5)
+      --opentsdb_telnet.worker int              opentsdb_telnet write worker. Env "BLM_OPENTSDB_TELNET_WORKER" (default 1000)
+      --pool.maxConnect int                     max connections to taosd. Env "BLM_POOL_MAX_CONNECT" (default 4000)
+      --pool.maxIdle int                        max idle connections to taosd. Env "BLM_POOL_MAX_IDLE" (default 4000)
   -P, --port int                                http port. Env "BLM_PORT" (default 6041)
       --ssl.certFile string                     ssl cert file path. Env "BLM_SSL_CERT_FILE"
       --ssl.enable                              enable ssl. Env "BLM_SSL_ENABLE"
