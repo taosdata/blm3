@@ -61,8 +61,8 @@ func init() {
 	viper.SetDefault("node_exporter.password", common.DefaultPassword)
 
 	_ = viper.BindEnv("node_exporter.urls", "BLM_NODE_EXPORTER_URLS")
-	pflag.StringSlice("node_exporter.urls", []string{}, `node_exporter urls. Env "BLM_NODE_EXPORTER_URLS"`)
-	viper.SetDefault("node_exporter.urls", []string{})
+	pflag.StringSlice("node_exporter.urls", []string{"http://localhost:9100"}, `node_exporter urls. Env "BLM_NODE_EXPORTER_URLS"`)
+	viper.SetDefault("node_exporter.urls", []string{"http://localhost:9100"})
 
 	_ = viper.BindEnv("node_exporter.responseTimeout", "BLM_NODE_EXPORTER_RESPONSE_TIMEOUT")
 	pflag.Duration("node_exporter.responseTimeout", 5*time.Second, `node_exporter response timeout. Env "BLM_NODE_EXPORTER_RESPONSE_TIMEOUT"`)
