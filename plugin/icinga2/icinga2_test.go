@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/taosdata/blm3/config"
 	"github.com/taosdata/driver-go/v2/af"
@@ -59,17 +60,18 @@ func TestGatherServicesStatus(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	conn, err := af.Open("", "", "", "icinga2", 0)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	conn, err := af.Open("", "", "", "", 0)
+	assert.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.Exec("create database if not exists icinga2 precision 'ns' update 2")
+	assert.NoError(t, err)
+	err = conn.SelectDB("icinga2")
+	assert.NoError(t, err)
 	rows, err := conn.Query("select * from services order by ts desc limit 1")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	defer rows.Close()
 	k := rows.Columns()
 	v := make([]driver.Value, len(k))
 	mapV := make(map[string]interface{}, len(k))
