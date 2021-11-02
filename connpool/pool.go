@@ -61,9 +61,7 @@ func (p *Pool) Get() (*list.Element, error) {
 	if p.usingList.Len()+p.idleList.Len() < p.maxConnect {
 		var conn unsafe.Pointer
 		var err error
-		//thread.Lock()
 		conn, err = wrapper.TaosConnect("", p.user, p.password, "", 0)
-		//thread.Unlock()
 		if err != nil {
 			return nil, err
 		}
@@ -81,46 +79,18 @@ func (p *Pool) Put(e *list.Element) error {
 	if p.maxIdle > 0 {
 		if p.idleList.Len() >= p.maxIdle {
 			p.idleLock.Unlock()
-			//thread.Lock()
 			wrapper.TaosClose(taosConnect)
-			//thread.Unlock()
 			return nil
 		}
 		p.usingLock.Lock()
 		if p.idleList.Len()+p.usingList.Len() >= p.maxConnect {
 			p.idleLock.Unlock()
 			p.usingLock.Unlock()
-			//thread.Lock()
 			wrapper.TaosClose(taosConnect)
-			//thread.Unlock()
 			return nil
 		}
 		p.usingLock.Unlock()
 	}
-	//conn, err := af.NewConnector(taosConnect)
-	//if err != nil {
-	//	p.idleLock.Unlock()
-	//	return err
-	//}
-	//rows, err := conn.Query("select database()")
-	//if err != nil {
-	//	p.idleLock.Unlock()
-	//	_ = conn.Close()
-	//	return err
-	//}
-	//defer rows.Close()
-	//values := make([]driver.Value, 1)
-	//err = rows.Next(values)
-	//if err != nil {
-	//	p.idleLock.Unlock()
-	//	_ = conn.Close()
-	//	return err
-	//}
-	//if values[0] != nil {
-	//	p.idleLock.Unlock()
-	//	_ = conn.Close()
-	//	return nil
-	//}
 	p.idleList.PushBack(taosConnect)
 	p.idleLock.Unlock()
 	return nil
@@ -138,9 +108,7 @@ func (p *Pool) Release() {
 	for {
 		if f != nil {
 			v := f.Value.(unsafe.Pointer)
-			//thread.Lock()
 			wrapper.TaosClose(v)
-			//thread.Unlock()
 		} else {
 			break
 		}
@@ -151,9 +119,7 @@ func (p *Pool) Release() {
 	for {
 		if f != nil {
 			v := f.Value.(unsafe.Pointer)
-			//thread.Lock()
 			wrapper.TaosClose(v)
-			//thread.Unlock()
 		} else {
 			break
 		}
