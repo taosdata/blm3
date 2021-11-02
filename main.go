@@ -24,6 +24,7 @@ import (
 	_ "github.com/taosdata/blm3/plugin/opentsdbtelnet"
 	_ "github.com/taosdata/blm3/plugin/statsd"
 	"github.com/taosdata/blm3/rest"
+	_ "go.uber.org/automaxprocs"
 )
 
 var logger = log.GetLogger("main")

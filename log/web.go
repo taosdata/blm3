@@ -16,7 +16,6 @@ func GinLog() gin.HandlerFunc {
 		currentID := atomic.AddUint32(&id, 1)
 		startTime := time.Now()
 		c.Set("currentID", currentID)
-		c.Set("startTime", startTime)
 		c.Next()
 		latencyTime := time.Now().Sub(startTime)
 		reqMethod := c.Request.Method

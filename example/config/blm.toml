@@ -3,9 +3,8 @@ port = 6041
 logLevel = "info"
 
 [pool]
-maxConnect = 100
-maxIdle = 5
-idleTimeout = "1m"
+maxConnect = 4000
+maxIdle = 4000
 
 [ssl]
 enable = false
@@ -72,4 +71,4 @@ tcpKeepAlive = false
 db = "opentsdb_telnet"
 user = "root"
 password = "taosdata"
-worker = 100
+worker = 1000

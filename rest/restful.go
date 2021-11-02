@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"github.com/taosdata/blm3/db/async"
 	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/httperror"
 	"github.com/taosdata/blm3/log"
+	"github.com/taosdata/blm3/thread"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/common"
 	tErrors "github.com/taosdata/driver-go/v2/errors"
@@ -26,7 +27,6 @@ const LayoutNanoSecond = "2006-01-02 15:04:05.000000000"
 var logger = log.GetLogger("restful")
 
 type Restful struct {
-	reserveConn unsafe.Pointer
 }
 
 func (ctl *Restful) Init(r gin.IRouter) error {
@@ -78,16 +78,10 @@ type TDEngineRestfulResp struct {
 }
 
 func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTimeFunc) {
-	var result unsafe.Pointer
 	var s time.Time
 	isDebug := logger.Logger.IsLevelEnabled(logrus.DebugLevel)
 	id := web.GetRequestID(c)
 	logger := logger.WithField("sessionID", id)
-	defer func() {
-		if result != nil {
-			wrapper.TaosFreeResult(result)
-		}
-	}()
 	b, err := c.GetRawData()
 	if err != nil {
 		logger.WithError(err).Error("get request body error")
@@ -134,51 +128,51 @@ func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTi
 		}
 		logger.Debugln("taos put connect cost:", time.Now().Sub(s))
 	}()
+
 	if len(db) > 0 {
 		if isDebug {
 			s = time.Now()
 		}
-		code := wrapper.TaosSelectDB(taosConnect.TaosConnection, db)
+		var code int
+		thread.Lock()
+		code = wrapper.TaosSelectDB(taosConnect.TaosConnection, db)
+		thread.Unlock()
 		logger.Debugln("taos select db cost:", time.Now().Sub(s))
 		if code != httperror.SUCCESS {
 			if isDebug {
 				s = time.Now()
 			}
-			errorMsg := wrapper.TaosErrorStr(result)
+			errorMsg := tErrors.GetError(code)
 			logger.Debugln("taos select db get error string cost:", time.Now().Sub(s))
-			logger.Errorln("taos select db error:", sql, code&0xffff, errorMsg)
-			errorResponseWithMsg(c, code, errorMsg)
+			logger.Errorln("taos select db error:", sql, code&0xffff, errorMsg.Error())
+			errorResponseWithMsg(c, code, errorMsg.Error())
 			return
 		}
 	}
+
 	startExec := time.Now()
+
 	logger.Debugln(startExec, "start execute sql:", sql)
-	result = wrapper.TaosQuery(taosConnect.TaosConnection, sql)
+	result, err := async.GlobalAsync.TaosExec(taosConnect.TaosConnection, sql, timeFunc)
 	logger.Debugln("execute sql cost:", time.Now().Sub(startExec))
+	if err != nil {
+		tError, ok := err.(*tErrors.TaosError)
+		if ok {
+			errorResponseWithMsg(c, int(tError.Code), tError.ErrStr)
+		} else {
+			errorResponseWithMsg(c, 0xffff, err.Error())
+		}
+		return
+	}
 	if isDebug {
 		s = time.Now()
 	}
-	code := wrapper.TaosError(result)
-	logger.Debugln("taos get error cost:", time.Now().Sub(s))
-	if code != httperror.SUCCESS {
-		if isDebug {
-			s = time.Now()
-		}
-		errorMsg := wrapper.TaosErrorStr(result)
-		logger.Debugln("taos get error string cost:", time.Now().Sub(s))
-		logger.Errorln("taos execute sql error:", sql, code&0xffff, errorMsg)
-		errorResponseWithMsg(c, code, errorMsg)
-		return
-	}
-	numFields := wrapper.TaosFieldCount(result)
-	if numFields == 0 {
-		// there are no select and show kinds of commands
-		affectedRows := wrapper.TaosAffectedRows(result)
-		logger.Debugln("execute sql success affected rows:", affectedRows)
+	if result.FieldCount == 0 {
+		logger.Debugln("execute sql success affected rows:", result.AffectedRows)
 		c.JSON(http.StatusOK, &TDEngineRestfulResp{
 			Status:     "succ",
 			Head:       []string{"affected_rows"},
-			Data:       [][]driver.Value{{affectedRows}},
+			Data:       [][]driver.Value{{result.AffectedRows}},
 			ColumnMeta: [][]interface{}{{"affected_rows", 4, 4}},
 			Rows:       1,
 		})
@@ -186,35 +180,24 @@ func (ctl *Restful) doQuery(c *gin.Context, db string, timeFunc wrapper.FormatTi
 		if isDebug {
 			s = time.Now()
 		}
-		header, _ := wrapper.ReadColumn(result, numFields)
-		logger.Debugln("taos read column cost:", time.Now().Sub(s))
-		var data = make([][]driver.Value, 0)
 		if isDebug {
 			s = time.Now()
 		}
-		for {
-			blockSize, block := wrapper.TaosFetchBlock(result)
-			if blockSize == 0 {
-				break
-			}
-			d := wrapper.ReadBlockWithTimeFormat(result, block, blockSize, header.ColLength, header.ColTypes, timeFunc)
-			data = append(data, d...)
-		}
-		logger.Debugln("execute sql success return data rows:", len(data), ",cost:", time.Now().Sub(s))
+		logger.Debugln("execute sql success return data rows:", len(result.Data), ",cost:", time.Now().Sub(s))
 		var columnMeta [][]interface{}
-		for i := 0; i < len(header.ColNames); i++ {
+		for i := 0; i < len(result.Header.ColNames); i++ {
 			columnMeta = append(columnMeta, []interface{}{
-				header.ColNames[i],
-				header.ColTypes[i],
-				header.ColLength[i],
+				result.Header.ColNames[i],
+				result.Header.ColTypes[i],
+				result.Header.ColLength[i],
 			})
 		}
 		c.JSON(http.StatusOK, &TDEngineRestfulResp{
 			Status:     "succ",
-			Head:       header.ColNames,
-			Data:       data,
+			Head:       result.Header.ColNames,
+			Data:       result.Data,
 			ColumnMeta: columnMeta,
-			Rows:       len(data),
+			Rows:       len(result.Data),
 		})
 	}
 }
@@ -245,7 +228,5 @@ func (ctl *Restful) des(c *gin.Context) {
 }
 
 func (ctl *Restful) Close() {
-	if ctl.reserveConn != nil {
-		wrapper.TaosClose(ctl.reserveConn)
-	}
+
 }

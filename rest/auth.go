@@ -47,17 +47,23 @@ func DecodeDes(auth string) (user, password string, err error) {
 		return "", "", err
 	}
 	b := pool.BytesPoolGet()
+	defer pool.BytesPoolPut(b)
 	for i := 0; i < 6; i++ {
 		origData := make([]byte, 8)
 		block.Decrypt(origData, d[i*8:+(i+1)*8])
 		b.Write(origData)
 		if i == 2 {
-			user = b.String()
-			pool.BytesPoolPut(b)
-			b = pool.BytesPoolGet()
+			user, err = b.ReadString(0)
+			if err == nil {
+				user = user[:len(user)-1]
+			}
+			b.Reset()
 		}
 	}
-	password = b.String()
+	password, err = b.ReadString(0)
+	if err == nil {
+		password = password[:len(password)-1]
+	}
 	return user, password, nil
 }
 
