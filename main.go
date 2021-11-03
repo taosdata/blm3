@@ -20,6 +20,7 @@ import (
 	_ "github.com/taosdata/blm3/plugin/collectd"
 	_ "github.com/taosdata/blm3/plugin/icinga2"
 	_ "github.com/taosdata/blm3/plugin/influxdb"
+	_ "github.com/taosdata/blm3/plugin/nodeexporter"
 	_ "github.com/taosdata/blm3/plugin/opentsdb"
 	_ "github.com/taosdata/blm3/plugin/opentsdbtelnet"
 	_ "github.com/taosdata/blm3/plugin/statsd"
