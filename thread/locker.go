@@ -1,6 +1,8 @@
 package thread
 
-import "runtime"
+import (
+	"runtime"
+)
 
 var c chan struct{}
 

@@ -36,22 +36,16 @@ func (a *Async) TaosExec(taosConnect unsafe.Pointer, sql string, timeFormat wrap
 	}
 	res := result.res
 	var fieldsCount int
-	thread.Lock()
 	fieldsCount = wrapper.TaosNumFields(res)
-	thread.Unlock()
 	execResult := &ExecResult{FieldCount: fieldsCount}
 	if fieldsCount == 0 {
 		var affectRows int
-		thread.Lock()
 		affectRows = wrapper.TaosAffectedRows(res)
-		thread.Unlock()
 		execResult.AffectedRows = affectRows
 		return execResult, nil
 	}
 	var rowsHeader *wrapper.RowsHeader
-	thread.Lock()
 	rowsHeader, err = wrapper.ReadColumn(res, fieldsCount)
-	thread.Unlock()
 	if err != nil {
 		return nil, err
 	}
