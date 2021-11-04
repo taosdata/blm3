@@ -10,7 +10,7 @@ import (
 	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
-	"github.com/taosdata/blm3/schemaless/influxdb"
+	"github.com/taosdata/blm3/schemaless/capi"
 	"github.com/taosdata/blm3/tools"
 	"github.com/taosdata/blm3/tools/web"
 	"github.com/taosdata/driver-go/v2/af"
@@ -113,7 +113,7 @@ func (p *Influxdb) write(c *gin.Context) {
 		start = time.Now()
 	}
 	logger.WithTime(start).Debugln("start insert influxdb:", string(data))
-	result, err := influxdb.InsertInfluxdb(conn, data, db, precision)
+	result, err := capi.InsertInfluxdb(conn, data, db, precision)
 	logger.Debugln("finish insert influxdb cost:", time.Now().Sub(start))
 	if err != nil {
 		logger.WithField("result", result).WithError(err).Errorln("insert line error")

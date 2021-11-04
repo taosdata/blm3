@@ -14,7 +14,7 @@ import (
 	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
-	"github.com/taosdata/blm3/schemaless/opentsdb"
+	"github.com/taosdata/blm3/schemaless/capi"
 )
 
 var logger = log.GetLogger("opentsdb_telnet")
@@ -262,7 +262,7 @@ func (p *Plugin) handleData(lines []string) {
 	}
 	for _, line := range lines {
 		logger.Debug(start, "insert telnet payload", line)
-		err = opentsdb.InsertTelnet(taosConn.TaosConnection, line, p.conf.DB)
+		err = capi.InsertOpentsdbTelnet(taosConn.TaosConnection, line, p.conf.DB)
 		if err != nil {
 			logger.WithError(err).Error("insert telnet payload error", line)
 		}

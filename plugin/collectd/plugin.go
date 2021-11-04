@@ -6,16 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/taosdata/blm3/db/commonpool"
-	"github.com/taosdata/blm3/schemaless/influxdb"
-
 	"github.com/gin-gonic/gin"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/parsers/collectd"
 	"github.com/influxdata/telegraf/plugins/serializers/influx"
 	"github.com/spf13/viper"
+	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
+	"github.com/taosdata/blm3/schemaless/capi"
 )
 
 var logger = log.GetLogger("collectd")
@@ -117,7 +116,7 @@ func (p *Plugin) HandleMetrics(serializer *influx.Serializer, metrics []telegraf
 	}()
 	start := time.Now()
 	logger.Debugln(start, "insert lines", string(data))
-	result, err := influxdb.InsertInfluxdb(taosConn.TaosConnection, data, p.conf.DB, "ns")
+	result, err := capi.InsertInfluxdb(taosConn.TaosConnection, data, p.conf.DB, "ns")
 	logger.Debugln("insert lines finish cost:", time.Now().Sub(start), string(data))
 	if err != nil || result.FailCount != 0 {
 		logger.WithError(err).WithField("result", result).Errorln("insert lines error", string(data))
