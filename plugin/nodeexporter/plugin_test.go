@@ -54,17 +54,14 @@ func TestNodeExporter_Gather(t *testing.T) {
 	err = conn.SelectDB("node_exporter")
 	assert.NoError(t, err)
 	time.Sleep(time.Second * 2)
-	rows, err := conn.Query("show node_exporter.stables")
+	rows, err := conn.Query("select last(value) as value from node_exporter.test_metric;")
 	assert.NoError(t, err)
 	defer rows.Close()
 	t.Log(rows.Columns())
-	assert.Equal(t, 5, len(rows.Columns()))
-	d := make([]driver.Value, 5)
-	names := []string{"test_metric", "go_gc_duration_seconds", "go_goroutines"}
-	for _, name := range names {
-		err = rows.Next(d)
-		assert.NoError(t, err)
-		assert.Equal(t, name, d[0])
-		t.Logf("%#v", d)
-	}
+	assert.Equal(t, 1, len(rows.Columns()))
+	d := make([]driver.Value, 1)
+	err = rows.Next(d)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(1), d[0])
+	t.Logf("%#v", d)
 }
