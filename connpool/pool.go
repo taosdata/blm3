@@ -6,6 +6,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/taosdata/blm3/thread"
 	"github.com/taosdata/driver-go/v2/wrapper"
 )
 
@@ -61,7 +62,9 @@ func (p *Pool) Get() (*list.Element, error) {
 	if p.usingList.Len()+p.idleList.Len() < p.maxConnect {
 		var conn unsafe.Pointer
 		var err error
+		thread.Lock()
 		conn, err = wrapper.TaosConnect("", p.user, p.password, "", 0)
+		thread.Unlock()
 		if err != nil {
 			return nil, err
 		}
