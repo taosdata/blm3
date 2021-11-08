@@ -22,7 +22,7 @@ import (
 	"github.com/taosdata/blm3/db/commonpool"
 	"github.com/taosdata/blm3/log"
 	"github.com/taosdata/blm3/plugin"
-	"github.com/taosdata/blm3/schemaless/influxdb"
+	"github.com/taosdata/blm3/schemaless/capi"
 )
 
 var logger = log.GetLogger("NodeExporter")
@@ -228,7 +228,7 @@ func (p *NodeExporter) requestSingle(conn unsafe.Pointer, req *Req) error {
 		if err != nil {
 			return err
 		}
-		result, err := influxdb.InsertInfluxdb(conn, data, p.conf.DB, "ns")
+		result, err := capi.InsertInfluxdb(conn, data, p.conf.DB, "ns")
 		if err != nil {
 			return err
 		}

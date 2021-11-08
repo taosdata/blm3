@@ -49,20 +49,6 @@ user = "root"
 password = "taosdata"
 worker = 10
 
-[icinga2]
-enable = false
-db = "icinga2"
-user = "root"
-password = "taosdata"
-host = "https://localhost:5665"
-responseTimeout = "5s"
-httpUsername = ""
-httpPassword = ""
-caCertFile = ""
-certFile = ""
-keyFile = ""
-insecureSkipVerify = true
-gatherDuration = "5s"
 
 [opentsdb_telnet]
 enable = false
