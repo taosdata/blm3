@@ -1,5 +1,7 @@
 # BLM3
 
+## Notice: The blm3 is replaced by taosadapter project and this repo is archived.
+
 ## Function
 
 * Compatible with restful interface
